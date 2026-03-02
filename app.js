@@ -85,6 +85,37 @@ async function fetchSimilarAniList(animeId) {
         });
 }
 
+async function fetchAnimeDetailsAniList(title) {
+    const query = `
+        query ($search: String) {
+            Media(search: $search, type: ANIME) {
+                id
+                title { romaji english native }
+                description(asHtml: false)
+                coverImage { extraLarge large }
+                bannerImage
+                trailer { id site thumbnail }
+                episodes
+                duration
+                format
+                status
+                seasonYear
+                season
+                averageScore
+                meanScore
+                popularity
+                genres
+                studios(isMain: true) { nodes { name } }
+                source
+                startDate { year month day }
+                endDate { year month day }
+            }
+        }
+    `;
+    const data = await anilistQuery(query, { search: title });
+    return data.Media;
+}
+
 async function fetchCoverImagesAniList(animeList) {
     const promises = animeList.map(async (anime, i) => {
         if (anime.coverImage) return; // Already has cover
@@ -114,7 +145,8 @@ const QUIZ_STEPS = [
             { label: "Existential & Thoughtful", desc: "In the mood for deep, mind-bending stories", examples: "Serial Experiments Lain, Evangelion, Monster" },
             { label: "Want to Laugh", desc: "Just here for comedy and good vibes", examples: "Gintama, KonoSuba, Grand Blue" },
             { label: "Feeling Adventurous", desc: "Ready to explore new worlds", examples: "One Piece, Made in Abyss, Frieren" },
-            { label: "Spicy & Frisky 🔥", desc: "In the mood for something steamy & bold", examples: "High School DxD, Prison School, Food Wars" }
+            { label: "Spicy & Frisky 🔥", desc: "In the mood for something steamy & bold", examples: "High School DxD, Prison School, Food Wars" },
+            { label: "Dark & Vengeful 🗡️", desc: "Craving revenge arcs and anti-heroes", examples: "Vinland Saga, Berserk, Redo of Healer" }
         ]
     },
     {
@@ -707,16 +739,148 @@ function renderResults(animeList, startIndex) {
         if (diffLabel.toLowerCase().includes("beginner")) diffClass = "difficulty-beginner";
         else if (diffLabel.toLowerCase().includes("veteran")) diffClass = "difficulty-veteran";
         const coverImg = anime.coverImage ? `<img src="${anime.coverImage}" alt="${escapeHTML(anime.title)}" class="result-cover" loading="lazy">` : `<div class="result-cover"></div>`;
-        return `<div class="result-card" style="animation-delay:${i * 0.06}s">
+        const globalIdx = startIndex + i;
+        return `<div class="result-card" style="animation-delay:${i * 0.06}s" onclick="openAnimeDetail(${globalIdx})" role="button" tabindex="0">
             <div class="result-card-inner">${coverImg}<div class="result-info">
                 <div class="result-rank-title"><span class="result-rank">${rank}</span><h3 class="result-title">${escapeHTML(anime.title)}</h3></div>
                 <div class="result-meta">${genrePills}<span class="result-episodes">📺 ${escapeHTML(anime.episodes)}</span><span class="result-rating">⭐ ${anime.rating}/10</span></div>
                 <p class="result-synopsis">${escapeHTML(anime.synopsis)}</p>
             </div></div>
             <div class="result-why">💬 ${escapeHTML(anime.why)}</div>
-            <div class="result-footer"><span class="result-difficulty ${diffClass}">${escapeHTML(diffLabel)}</span></div>
+            <div class="result-footer"><span class="result-difficulty ${diffClass}">${escapeHTML(diffLabel)}</span><span class="result-detail-hint">Click for trailer & details →</span></div>
         </div>`;
     }).join("");
+}
+
+// ============================================
+// ANIME DETAIL MODAL
+// ============================================
+async function openAnimeDetail(index) {
+    const anime = allRecommendations[index];
+    if (!anime) return;
+
+    // Create modal if it doesn't exist
+    let modal = document.getElementById('anime-detail-modal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'anime-detail-modal';
+        modal.className = 'anime-modal-overlay';
+        document.body.appendChild(modal);
+    }
+
+    // Show loading state
+    modal.innerHTML = `
+        <div class="anime-modal">
+            <button class="modal-close" onclick="closeAnimeDetail()">✕</button>
+            <div class="modal-loading">Loading details<span class="loading-dots"></span></div>
+        </div>
+    `;
+    modal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+
+    try {
+        // Fetch full details from AniList
+        const details = await fetchAnimeDetailsAniList(anime.title);
+
+        const title = details.title?.english || details.title?.romaji || anime.title;
+        const desc = details.description ? details.description.replace(/<[^>]*>/g, '') : anime.synopsis;
+        const banner = details.bannerImage || details.coverImage?.extraLarge || anime.coverImage || '';
+        const score = details.averageScore ? (details.averageScore / 10).toFixed(1) : anime.rating;
+        const eps = details.episodes || anime.episodes;
+        const format = details.format || '';
+        const status = details.status ? details.status.replace(/_/g, ' ') : '';
+        const year = details.seasonYear || '';
+        const season = details.season ? details.season.charAt(0) + details.season.slice(1).toLowerCase() : '';
+        const studio = details.studios?.nodes?.[0]?.name || '';
+        const genres = details.genres || anime.genres || [];
+        const popularity = details.popularity ? details.popularity.toLocaleString() : '';
+
+        // Build trailer
+        let trailerHTML = '';
+        if (details.trailer && details.trailer.site === 'youtube') {
+            trailerHTML = `
+                <div class="modal-trailer">
+                    <h3>🎬 Trailer</h3>
+                    <div class="trailer-wrapper">
+                        <iframe src="https://www.youtube.com/embed/${details.trailer.id}" 
+                            frameborder="0" allowfullscreen
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture">
+                        </iframe>
+                    </div>
+                </div>
+            `;
+        } else if (details.trailer && details.trailer.site === 'dailymotion') {
+            trailerHTML = `
+                <div class="modal-trailer">
+                    <h3>🎬 Trailer</h3>
+                    <div class="trailer-wrapper">
+                        <iframe src="https://www.dailymotion.com/embed/video/${details.trailer.id}" 
+                            frameborder="0" allowfullscreen>
+                        </iframe>
+                    </div>
+                </div>
+            `;
+        }
+
+        const genrePills = genres.map(g => `<span class="genre-pill">${escapeHTML(g)}</span>`).join('');
+
+        modal.innerHTML = `
+            <div class="anime-modal">
+                <button class="modal-close" onclick="closeAnimeDetail()">✕</button>
+                ${banner ? `<div class="modal-banner"><img src="${banner}" alt="${escapeHTML(title)}"></div>` : ''}
+                <div class="modal-content">
+                    <h2 class="modal-title">${escapeHTML(title)}</h2>
+                    <div class="modal-meta-row">
+                        ${score !== 'N/A' ? `<span class="modal-score">⭐ ${score}/10</span>` : ''}
+                        ${eps ? `<span class="modal-ep">📺 ${eps} episodes</span>` : ''}
+                        ${format ? `<span class="modal-format">${format}</span>` : ''}
+                        ${status ? `<span class="modal-status">${status}</span>` : ''}
+                    </div>
+                    <div class="modal-meta-row">
+                        ${year ? `<span>📅 ${season} ${year}</span>` : ''}
+                        ${studio ? `<span>🎨 ${studio}</span>` : ''}
+                        ${popularity ? `<span>❤️ ${popularity} fans</span>` : ''}
+                    </div>
+                    <div class="modal-genres">${genrePills}</div>
+                    ${trailerHTML}
+                    <div class="modal-description">
+                        <h3>📖 Description</h3>
+                        <p>${escapeHTML(desc)}</p>
+                    </div>
+                </div>
+            </div>
+        `;
+
+    } catch (err) {
+        console.error('Detail fetch error:', err);
+        // Fallback to what we already have
+        modal.innerHTML = `
+            <div class="anime-modal">
+                <button class="modal-close" onclick="closeAnimeDetail()">✕</button>
+                <div class="modal-content">
+                    <h2 class="modal-title">${escapeHTML(anime.title)}</h2>
+                    <div class="modal-meta-row">
+                        <span class="modal-score">⭐ ${anime.rating}/10</span>
+                        <span class="modal-ep">📺 ${anime.episodes}</span>
+                    </div>
+                    <div class="modal-genres">${(anime.genres || []).map(g => `<span class="genre-pill">${escapeHTML(g)}</span>`).join('')}</div>
+                    <div class="modal-description">
+                        <h3>📖 Description</h3>
+                        <p>${escapeHTML(anime.synopsis)}</p>
+                    </div>
+                    <p style="color: var(--muted); margin-top: 1rem;">⚠️ Could not load trailer. Try again later.</p>
+                </div>
+            </div>
+        `;
+    }
+}
+
+function closeAnimeDetail() {
+    const modal = document.getElementById('anime-detail-modal');
+    if (modal) {
+        modal.classList.remove('active');
+        document.body.style.overflow = '';
+    }
 }
 
 // ============================================
