@@ -2,8 +2,6 @@
    ONIMATCH V2 — Quiz + Similar Anime + Robot
    ============================================ */
 
-const API_KEY = "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";
-const API_URL = "https://openrouter.ai/api/v1/chat/completions";
 const JIKAN_URL = "https://api.jikan.moe/v4";
 
 // ============================================
@@ -503,21 +501,10 @@ Do NOT include the anime the user mentioned. Include variety: well-known titles,
 // ============================================
 async function callAPIAndShowResults(systemPrompt, userMessage) {
     try {
-        const response = await fetch(API_URL, {
+        const response = await fetch("/.netlify/functions/recommend", {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${API_KEY}`
-            },
-            body: JSON.stringify({
-                model: "google/gemini-2.0-flash-001",
-                max_tokens: 8192,
-                temperature: 0.85,
-                messages: [
-                    { role: "system", content: systemPrompt },
-                    { role: "user", content: userMessage }
-                ]
-            })
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ systemPrompt, userMessage })
         });
 
         if (!response.ok) throw new Error(`API error ${response.status}`);
