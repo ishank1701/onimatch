@@ -820,6 +820,17 @@ async function openAnimeDetail(index) {
                     </div>
                 </div>
             `;
+        } else {
+            // Fallback: YouTube search link
+            const ytSearchURL = `https://www.youtube.com/results?search_query=${encodeURIComponent(title + ' anime trailer')}`;
+            trailerHTML = `
+                <div class="modal-trailer">
+                    <h3>🎬 Trailer</h3>
+                    <a href="${ytSearchURL}" target="_blank" rel="noopener noreferrer" class="trailer-fallback-link">
+                        ▶️ Watch Trailer on YouTube →
+                    </a>
+                </div>
+            `;
         }
 
         const genrePills = genres.map(g => `<span class="genre-pill">${escapeHTML(g)}</span>`).join('');
@@ -882,6 +893,16 @@ function closeAnimeDetail() {
         document.body.style.overflow = '';
     }
 }
+
+// Close modal on clicking outside or pressing Escape
+document.addEventListener('click', (e) => {
+    if (e.target && e.target.id === 'anime-detail-modal') {
+        closeAnimeDetail();
+    }
+});
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeAnimeDetail();
+});
 
 // ============================================
 // ERROR

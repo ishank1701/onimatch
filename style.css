@@ -2121,6 +2121,28 @@ body {
     border: none;
 }
 
+.trailer-fallback-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 24px;
+    background: linear-gradient(135deg, #FF0000, #CC0000);
+    color: white;
+    font-family: var(--font-display);
+    font-size: 0.9rem;
+    font-weight: 700;
+    border-radius: var(--radius-lg);
+    text-decoration: none;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(255, 0, 0, 0.25);
+}
+
+.trailer-fallback-link:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 25px rgba(255, 0, 0, 0.35);
+    filter: brightness(1.1);
+}
+
 .modal-description {
     margin-top: 16px;
 }
