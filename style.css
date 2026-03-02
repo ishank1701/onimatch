@@ -537,6 +537,9 @@ body {
     z-index: 100;
     display: flex;
     justify-content: center;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none;
 }
 
 .robot {

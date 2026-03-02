@@ -662,6 +662,81 @@ btnRetry.addEventListener("click", () => {
 });
 
 // ============================================
+// ROBOT — Draggable (Mouse + Touch)
+// ============================================
+(function initDraggableRobot() {
+    const robotEl = document.getElementById("robot-container");
+    if (!robotEl) return;
+
+    let isDragging = false;
+    let hasMoved = false;
+    let startX, startY, offsetX, offsetY;
+    const DRAG_THRESHOLD = 5; // px before counting as a drag
+
+    function onStart(e) {
+        const ev = e.touches ? e.touches[0] : e;
+        const rect = robotEl.getBoundingClientRect();
+        offsetX = ev.clientX - rect.left;
+        offsetY = ev.clientY - rect.top;
+        startX = ev.clientX;
+        startY = ev.clientY;
+        isDragging = true;
+        hasMoved = false;
+        robotEl.style.transition = "none";
+        robotEl.style.cursor = "grabbing";
+    }
+
+    function onMove(e) {
+        if (!isDragging) return;
+        const ev = e.touches ? e.touches[0] : e;
+        const dx = Math.abs(ev.clientX - startX);
+        const dy = Math.abs(ev.clientY - startY);
+        if (!hasMoved && dx < DRAG_THRESHOLD && dy < DRAG_THRESHOLD) return;
+        hasMoved = true;
+        if (e.cancelable) e.preventDefault();
+
+        // Switch from bottom/right to top/left positioning on first drag
+        if (robotEl.style.bottom !== "auto") {
+            const rect = robotEl.getBoundingClientRect();
+            robotEl.style.left = rect.left + "px";
+            robotEl.style.top = rect.top + "px";
+            robotEl.style.right = "auto";
+            robotEl.style.bottom = "auto";
+        }
+
+        let newX = ev.clientX - offsetX;
+        let newY = ev.clientY - offsetY;
+
+        // Clamp to viewport
+        const w = robotEl.offsetWidth;
+        const h = robotEl.offsetHeight;
+        newX = Math.max(0, Math.min(newX, window.innerWidth - w));
+        newY = Math.max(0, Math.min(newY, window.innerHeight - h));
+
+        robotEl.style.left = newX + "px";
+        robotEl.style.top = newY + "px";
+    }
+
+    function onEnd() {
+        isDragging = false;
+        robotEl.style.cursor = "grab";
+    }
+
+    // Mouse events
+    robotEl.addEventListener("mousedown", onStart);
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onEnd);
+
+    // Touch events
+    robotEl.addEventListener("touchstart", onStart, { passive: true });
+    document.addEventListener("touchmove", onMove, { passive: false });
+    document.addEventListener("touchend", onEnd);
+
+    // Set initial grab cursor
+    robotEl.style.cursor = "grab";
+})();
+
+// ============================================
 // INIT
 // ============================================
 renderStep(0);
