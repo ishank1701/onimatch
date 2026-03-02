@@ -1,8 +1,103 @@
 /* ============================================
    ONIMATCH V2 — Quiz + Similar Anime + Robot
+   AniList GraphQL + OpenRouter AI
    ============================================ */
 
-const JIKAN_URL = "https://api.jikan.moe/v4";
+const ANILIST_URL = "https://graphql.anilist.co";
+
+// ============================================
+// ANILIST GRAPHQL HELPERS
+// ============================================
+async function anilistQuery(query, variables = {}) {
+    const res = await fetch(ANILIST_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Accept": "application/json" },
+        body: JSON.stringify({ query, variables })
+    });
+    if (!res.ok) throw new Error(`AniList API error ${res.status}`);
+    const json = await res.json();
+    if (json.errors) throw new Error(json.errors[0]?.message || "AniList query failed");
+    return json.data;
+}
+
+async function searchAnimeAniList(searchQuery) {
+    const query = `
+        query ($search: String) {
+            Page(perPage: 6) {
+                media(search: $search, type: ANIME, sort: POPULARITY_DESC) {
+                    id
+                    title { romaji english }
+                    coverImage { large extraLarge }
+                    format
+                    seasonYear
+                    averageScore
+                    episodes
+                    genres
+                    description(asHtml: false)
+                }
+            }
+        }
+    `;
+    const data = await anilistQuery(query, { search: searchQuery });
+    return data.Page.media;
+}
+
+async function fetchSimilarAniList(animeId) {
+    const query = `
+        query ($id: Int) {
+            Media(id: $id, type: ANIME) {
+                recommendations(sort: RATING_DESC, perPage: 50) {
+                    nodes {
+                        rating
+                        mediaRecommendation {
+                            id
+                            title { romaji english }
+                            coverImage { large extraLarge }
+                            format
+                            seasonYear
+                            averageScore
+                            episodes
+                            genres
+                            description(asHtml: false)
+                            meanScore
+                        }
+                    }
+                }
+            }
+        }
+    `;
+    const data = await anilistQuery(query, { id: animeId });
+    return data.Media.recommendations.nodes
+        .filter(n => n.mediaRecommendation)
+        .map(n => {
+            const m = n.mediaRecommendation;
+            const cleanDesc = m.description ? m.description.replace(/<[^>]*>/g, '').substring(0, 150) : '';
+            return {
+                title: m.title.english || m.title.romaji,
+                synopsis: cleanDesc || "No description available.",
+                episodes: m.episodes ? `${m.episodes} eps` : m.format || "?",
+                rating: m.averageScore ? (m.averageScore / 10).toFixed(1) : "N/A",
+                genres: m.genres || [],
+                why: `Recommended by ${n.rating > 0 ? n.rating : 'the'} AniList ${n.rating > 0 ? 'users' : 'community'}`,
+                coverImage: m.coverImage?.extraLarge || m.coverImage?.large || null,
+                anilistId: m.id
+            };
+        });
+}
+
+async function fetchCoverImagesAniList(animeList) {
+    const promises = animeList.map(async (anime, i) => {
+        if (anime.coverImage) return; // Already has cover
+        try {
+            await new Promise(r => setTimeout(r, i * 200)); // Gentle stagger
+            const results = await searchAnimeAniList(anime.title);
+            if (results.length > 0) {
+                anime.coverImage = results[0].coverImage?.extraLarge || results[0].coverImage?.large || null;
+            }
+        } catch (e) { /* silent */ }
+    });
+    await Promise.all(promises);
+}
 
 // ============================================
 // QUIZ DATA
@@ -37,7 +132,11 @@ const QUIZ_STEPS = [
             { label: "Supernatural", desc: "Ghosts, demons, otherworldly powers" },
             { label: "Mystery / Detective", desc: "Whodunnits, puzzles, investigations" },
             { label: "Historical / Military", desc: "Wars, samurai, historical drama" },
-            { label: "Comedy", desc: "Pure laughs and absurd situations" }
+            { label: "Comedy", desc: "Pure laughs and absurd situations" },
+            { label: "Adult / Ecchi", desc: "Mature content, fan service, 18+ themes" },
+            { label: "Music", desc: "Bands, idols, the power of song" },
+            { label: "Harem / Reverse Harem", desc: "One protagonist, many love interests" },
+            { label: "Seinen / Josei", desc: "Mature storytelling for older audiences" }
         ]
     },
     {
@@ -346,7 +445,7 @@ async function submitQuiz() {
 
     const userMessage = `User preferences:\n${selTexts.join("\n")}`;
 
-    const systemPrompt = `You are an anime recommender. Recommend exactly 15 anime matching the user's taste. Return ONLY a JSON array, no markdown. Each item: {"title":string,"synopsis":string(1 sentence),"episodes":string,"rating":number,"genres":[strings],"why":string(1 sentence)}. Include variety. All 15 UNIQUE.`;
+    const systemPrompt = `You are an anime recommender. Recommend exactly 25 anime matching the user's taste. Return ONLY a JSON array, no markdown. Each item: {"title":string,"synopsis":string(1 sentence),"episodes":string,"rating":number,"genres":[strings],"why":string(1 sentence)}. Include variety. All 25 UNIQUE.`;
 
     await callAPIAndShowResults(systemPrompt, userMessage);
 }
@@ -361,7 +460,7 @@ searchInput.addEventListener("input", () => {
         autocompleteDropdown.classList.add("hidden");
         return;
     }
-    searchDebounce = setTimeout(() => searchJikanAnime(query), 400);
+    searchDebounce = setTimeout(() => searchAnimeForAutocomplete(query), 400);
 });
 
 // Close dropdown on click outside
@@ -371,27 +470,26 @@ document.addEventListener("click", (e) => {
     }
 });
 
-async function searchJikanAnime(query) {
+async function searchAnimeForAutocomplete(query) {
     try {
-        const res = await fetch(`${JIKAN_URL}/anime?q=${encodeURIComponent(query)}&limit=6&sfw=true`);
-        if (!res.ok) return;
-        const data = await res.json();
-        if (!data.data || data.data.length === 0) {
+        const results = await searchAnimeAniList(query);
+        if (!results || results.length === 0) {
             autocompleteDropdown.classList.add("hidden");
             return;
         }
-        renderAutocomplete(data.data);
+        renderAutocomplete(results);
     } catch (e) { /* silent */ }
 }
 
 function renderAutocomplete(results) {
     autocompleteDropdown.innerHTML = results.map(anime => {
-        const img = anime.images?.jpg?.small_image_url || '';
-        const title = anime.title || anime.title_english || '';
-        const year = anime.year || '';
-        const type = anime.type || '';
-        const score = anime.score ? `⭐ ${anime.score}` : '';
-        return `<div class="ac-item" data-title="${escapeHTML(title)}" data-img="${img}" data-type="${type}" data-year="${year}" data-score="${score}">
+        const img = anime.coverImage?.large || '';
+        const title = anime.title?.english || anime.title?.romaji || '';
+        const year = anime.seasonYear || '';
+        const type = anime.format || '';
+        const score = anime.averageScore ? `⭐ ${(anime.averageScore / 10).toFixed(1)}` : '';
+        const anilistId = anime.id;
+        return `<div class="ac-item" data-title="${escapeHTML(title)}" data-img="${img}" data-type="${type}" data-year="${year}" data-score="${score}" data-id="${anilistId}">
             <img src="${img}" alt="" class="ac-img">
             <div class="ac-info">
                 <div class="ac-title">${escapeHTML(title)}</div>
@@ -409,7 +507,8 @@ function renderAutocomplete(results) {
                 img: item.dataset.img,
                 type: item.dataset.type,
                 year: item.dataset.year,
-                score: item.dataset.score
+                score: item.dataset.score,
+                anilistId: parseInt(item.dataset.id)
             });
         });
     });
@@ -467,11 +566,30 @@ async function submitSimilar() {
     startRunnerAnimation();
     setRobotExpression("searching");
 
-    const userMessage = `Find 15 anime similar to "${selectedAnime.title}" (${selectedAnime.type}).`;
+    try {
+        // Use AniList native recommendations (no AI needed!)
+        const recommendations = await fetchSimilarAniList(selectedAnime.anilistId);
 
-    const systemPrompt = `You are an anime recommender. Recommend exactly 15 anime SIMILAR to the one the user mentions. Return ONLY a JSON array, no markdown. Each item: {"title":string,"synopsis":string(1 sentence),"episodes":string,"rating":number,"genres":[strings],"why":string(1 sentence)}. Do NOT include the mentioned anime. All 15 UNIQUE.`;
+        if (!recommendations || recommendations.length === 0) {
+            throw new Error("No recommendations found for this anime.");
+        }
 
-    await callAPIAndShowResults(systemPrompt, userMessage);
+        allRecommendations = recommendations;
+
+        completeRunnerAnimation();
+        await new Promise(r => setTimeout(r, 600));
+
+        currentPage = 1;
+        showResultsPage(1);
+        setRobotExpression("party");
+        setTimeout(() => setRobotExpression("idle"), 4000);
+
+    } catch (err) {
+        console.error("AniList Similar Error:", err);
+        stopRunnerAnimation();
+        setRobotExpression("sad");
+        showError(err.message);
+    }
 }
 
 // ============================================
@@ -501,8 +619,8 @@ async function callAPIAndShowResults(systemPrompt, userMessage) {
 
         if (!Array.isArray(recommendations) || recommendations.length === 0) throw new Error("Invalid format");
 
-        // Fetch covers for first batch
-        await fetchCoverImages(recommendations.slice(0, 10));
+        // Fetch covers for first batch via AniList
+        await fetchCoverImagesAniList(recommendations.slice(0, 10));
         allRecommendations = recommendations;
 
         completeRunnerAnimation();
@@ -514,7 +632,7 @@ async function callAPIAndShowResults(systemPrompt, userMessage) {
         setTimeout(() => setRobotExpression("idle"), 4000);
 
         // Fetch remaining covers in background
-        fetchCoverImages(recommendations.slice(10));
+        fetchCoverImagesAniList(recommendations.slice(10));
 
     } catch (err) {
         console.error("ONIMATCH Error:", err);
@@ -525,23 +643,8 @@ async function callAPIAndShowResults(systemPrompt, userMessage) {
 }
 
 // ============================================
-// JIKAN COVER IMAGES
+// COVER IMAGES (handled by AniList helpers above)
 // ============================================
-async function fetchCoverImages(animeList) {
-    const promises = animeList.map(async (anime, i) => {
-        try {
-            await new Promise(r => setTimeout(r, i * 400));
-            const res = await fetch(`${JIKAN_URL}/anime?q=${encodeURIComponent(anime.title)}&limit=1`);
-            if (res.ok) {
-                const data = await res.json();
-                if (data.data?.[0]) {
-                    anime.coverImage = data.data[0].images?.jpg?.large_image_url || data.data[0].images?.jpg?.image_url || null;
-                }
-            }
-        } catch (e) { /* silent */ }
-    });
-    await Promise.all(promises);
-}
 
 // ============================================
 // PAGINATION
