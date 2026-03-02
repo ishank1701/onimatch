@@ -616,7 +616,26 @@ async function callAPIAndShowResults(systemPrompt, userMessage) {
             const jsonMatch = jsonStr.match(/\[[\s\S]*\]/);
             if (jsonMatch) jsonStr = jsonMatch[0];
             recommendations = JSON.parse(jsonStr);
-        } catch (e) { throw new Error("Failed to parse recommendations"); }
+        } catch (e) {
+            // Try to recover truncated JSON
+            console.warn("Initial parse failed, attempting recovery...", e.message);
+            try {
+                let jsonStr = textContent.trim().replace(/```json\s*/g, "").replace(/```\s*/g, "");
+                // Find the start of the array
+                const arrStart = jsonStr.indexOf('[');
+                if (arrStart === -1) throw new Error("No JSON array found");
+                jsonStr = jsonStr.substring(arrStart);
+                // Try to close truncated JSON: remove last incomplete object and close array
+                const lastComplete = jsonStr.lastIndexOf('}');
+                if (lastComplete > 0) {
+                    jsonStr = jsonStr.substring(0, lastComplete + 1) + ']';
+                }
+                recommendations = JSON.parse(jsonStr);
+            } catch (e2) {
+                console.error("Raw AI response:", textContent);
+                throw new Error("Failed to parse recommendations");
+            }
+        }
 
         if (!Array.isArray(recommendations) || recommendations.length === 0) throw new Error("Invalid format");
 
