@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ONIMATCH — Find Your Perfect Anime</title>
+    <meta name="description"
+        content="Take a fun quiz or search by anime name to get personalized anime recommendations.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <!-- Animated Background -->
+    <div class="bg-particles" aria-hidden="true">
+        <div class="particle p1"></div>
+        <div class="particle p2"></div>
+        <div class="particle p3"></div>
+        <div class="particle p4"></div>
+        <div class="particle p5"></div>
+        <div class="particle p6"></div>
+    </div>
+    <div class="scan-lines" aria-hidden="true"></div>
+
+    <!-- Main App -->
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="hero-logo">
+                <img src="image 6.png" alt="ONIMATCH" class="hero-img">
+            </div>
+            <p class="site-tagline">Get personalized anime recommendations based on your mood, genre & taste</p>
+        </header>
+
+        <!-- Tab Bar -->
+        <div class="tab-bar" id="tab-bar">
+            <button class="tab-btn active" data-tab="quiz" id="tab-quiz">
+                <span class="tab-icon">🎯</span> Quiz Match
+            </button>
+            <button class="tab-btn" data-tab="similar" id="tab-similar">
+                <span class="tab-icon">🔍</span> Find Similar
+            </button>
+            <div class="tab-indicator" id="tab-indicator"></div>
+        </div>
+
+        <!-- ======================== -->
+        <!-- SECTION 1: QUIZ MATCH   -->
+        <!-- ======================== -->
+        <div class="section-panel active" id="section-quiz">
+            <!-- Progress Bar -->
+            <div class="progress-wrapper" id="progress-wrapper">
+                <div class="progress-info">
+                    <span class="progress-label" id="progress-label">Step 1 of 5</span>
+                    <span class="progress-pct" id="progress-pct">20%</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progress-fill"></div>
+                </div>
+            </div>
+
+            <!-- Quiz Container -->
+            <div class="quiz-container" id="quiz-container">
+                <div class="quiz-step" id="quiz-step"></div>
+                <div class="quiz-nav" id="quiz-nav">
+                    <button class="btn-back hidden" id="btn-back">← Back</button>
+                    <button class="btn-next" id="btn-next" disabled>Next →</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================== -->
+        <!-- SECTION 2: FIND SIMILAR    -->
+        <!-- ========================== -->
+        <div class="section-panel" id="section-similar">
+            <div class="similar-search-box">
+                <h2 class="similar-title">Find Anime Similar To...</h2>
+                <p class="similar-desc">Type an anime you love and we'll find 30 similar titles</p>
+                <div class="search-input-wrapper">
+                    <input type="text" id="anime-search-input" class="anime-search-input"
+                        placeholder="e.g. Attack on Titan, One Piece, Death Note..." autocomplete="off">
+                    <div class="search-icon">🔍</div>
+                    <div class="autocomplete-dropdown hidden" id="autocomplete-dropdown"></div>
+                </div>
+                <button class="btn-action btn-find-similar" id="btn-find-similar" disabled>
+                    Find Similar Anime →
+                </button>
+            </div>
+        </div>
+
+        <!-- ======================== -->
+        <!-- SHARED: Loading State   -->
+        <!-- ======================== -->
+        <div class="loading-container hidden" id="loading-container">
+            <div class="loading-track">
+                <div class="loading-ground"></div>
+                <div class="runner" id="runner">
+                    <div class="runner-body">
+                        <div class="runner-head"></div>
+                        <div class="runner-hair"></div>
+                        <div class="runner-eye"></div>
+                        <div class="runner-torso"></div>
+                        <div class="runner-arm runner-arm-back"></div>
+                        <div class="runner-arm runner-arm-front"></div>
+                        <div class="runner-leg runner-leg-back"></div>
+                        <div class="runner-leg runner-leg-front"></div>
+                    </div>
+                    <div class="runner-dust"></div>
+                    <div class="runner-dust runner-dust-2"></div>
+                    <div class="runner-dust runner-dust-3"></div>
+                </div>
+                <div class="loading-progress-bar">
+                    <div class="loading-progress-fill" id="loading-progress-fill"></div>
+                </div>
+            </div>
+            <p class="loading-text">Finding your perfect matches<span class="loading-dots"></span></p>
+        </div>
+
+        <!-- ======================== -->
+        <!-- SHARED: Results         -->
+        <!-- ======================== -->
+        <div class="results-container hidden" id="results-container">
+            <h2 class="results-title">Your Anime Matches</h2>
+            <p class="results-subtitle" id="results-count"></p>
+            <div class="results-grid" id="results-grid"></div>
+            <div class="pagination" id="pagination"></div>
+            <button class="btn-action btn-try-again" id="btn-try-again">⟳ Start Over</button>
+        </div>
+
+        <!-- Error State -->
+        <div class="error-container hidden" id="error-container">
+            <div class="error-icon">⚠</div>
+            <h2 class="error-title">Something went wrong</h2>
+            <p class="error-text" id="error-text"></p>
+            <button class="btn-action btn-retry" id="btn-retry">↻ Retry</button>
+        </div>
+    </div>
+
+    <!-- Robot Mascot (fixed position) -->
+    <div class="robot-container" id="robot-container">
+        <div class="robot" id="robot">
+            <div class="robot-hat">
+                <div class="hat-brim"></div>
+                <div class="hat-dome"></div>
+                <div class="hat-band"></div>
+            </div>
+            <div class="robot-head">
+                <div class="robot-antenna">
+                    <div class="antenna-ball"></div>
+                </div>
+                <div class="robot-eyes">
+                    <div class="robot-eye robot-eye-left" id="eye-left">
+                        <div class="robot-pupil" id="pupil-left"></div>
+                        <div class="eye-shine"></div>
+                    </div>
+                    <div class="robot-eye robot-eye-right" id="eye-right">
+                        <div class="robot-pupil" id="pupil-right"></div>
+                        <div class="eye-shine"></div>
+                    </div>
+                </div>
+                <div class="robot-mouth" id="robot-mouth">
+                    <div class="mouth-inner"></div>
+                </div>
+                <div class="robot-cheek cheek-left"></div>
+                <div class="robot-cheek cheek-right"></div>
+            </div>
+            <div class="robot-body">
+                <div class="robot-chest-light"></div>
+                <div class="robot-bolt bolt-left"></div>
+                <div class="robot-bolt bolt-right"></div>
+            </div>
+            <div class="robot-arm robot-arm-left" id="arm-left"></div>
+            <div class="robot-arm robot-arm-right" id="arm-right"></div>
+            <div class="robot-speech" id="robot-speech">
+                <span id="speech-text">Hey! Ready to find your next anime? 🏴‍☠️</span>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>
