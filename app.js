@@ -346,18 +346,7 @@ async function submitQuiz() {
 
     const userMessage = `User preferences:\n${selTexts.join("\n")}`;
 
-    const systemPrompt = `You are an expert anime recommender. Based on the user's preferences, recommend exactly 30 anime that best match their taste.
-
-Return ONLY a valid JSON array with no markdown or explanation. Each item:
-- "title": string (official English or Romaji title)
-- "synopsis": string (2-3 sentences)
-- "episodes": string (e.g. "24 episodes", "1 Movie", "Ongoing")
-- "rating": number (out of 10)
-- "genres": array of strings
-- "why": string (one sentence — why this matches)
-- "difficulty": string ("Beginner-friendly" | "Casual" | "For veterans")
-
-Include variety: well-known titles, hidden gems, classics, newer shows. Order from best match to good match. All 30 must be UNIQUE.`;
+    const systemPrompt = `You are an anime recommender. Recommend exactly 15 anime matching the user's taste. Return ONLY a JSON array, no markdown. Each item: {"title":string,"synopsis":string(1 sentence),"episodes":string,"rating":number,"genres":[strings],"why":string(1 sentence)}. Include variety. All 15 UNIQUE.`;
 
     await callAPIAndShowResults(systemPrompt, userMessage);
 }
@@ -478,20 +467,9 @@ async function submitSimilar() {
     startRunnerAnimation();
     setRobotExpression("searching");
 
-    const userMessage = `The user loves the anime "${selectedAnime.title}" (${selectedAnime.type}). Find 30 anime that are similar in theme, style, tone, and appeal.`;
+    const userMessage = `Find 15 anime similar to "${selectedAnime.title}" (${selectedAnime.type}).`;
 
-    const systemPrompt = `You are an expert anime recommender. The user has told you an anime they love. Recommend exactly 30 anime that are SIMILAR to it — same vibes, themes, quality, and feel.
-
-Return ONLY a valid JSON array with no markdown or explanation. Each item:
-- "title": string (official English or Romaji title)
-- "synopsis": string (2-3 sentences)
-- "episodes": string (e.g. "24 episodes", "1 Movie", "Ongoing")
-- "rating": number (out of 10)
-- "genres": array of strings
-- "why": string (one sentence — why this is similar)
-- "difficulty": string ("Beginner-friendly" | "Casual" | "For veterans")
-
-Do NOT include the anime the user mentioned. Include variety: well-known titles, hidden gems, classics, newer shows. Order from most similar to least similar. All 30 must be UNIQUE.`;
+    const systemPrompt = `You are an anime recommender. Recommend exactly 15 anime SIMILAR to the one the user mentions. Return ONLY a JSON array, no markdown. Each item: {"title":string,"synopsis":string(1 sentence),"episodes":string,"rating":number,"genres":[strings],"why":string(1 sentence)}. Do NOT include the mentioned anime. All 15 UNIQUE.`;
 
     await callAPIAndShowResults(systemPrompt, userMessage);
 }

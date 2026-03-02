@@ -52,7 +52,7 @@ exports.handler = async (event) => {
             },
             body: JSON.stringify({
                 model: "google/gemini-2.0-flash-001",
-                max_tokens: 4096,
+                max_tokens: 2048,
                 temperature: 0.85,
                 messages: [
                     { role: "system", content: systemPrompt },
