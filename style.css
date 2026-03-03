@@ -164,9 +164,9 @@ body {
 .app-container {
     position: relative;
     z-index: 2;
-    max-width: 580px;
+    max-width: 1200px;
     margin: 0 auto;
-    padding: 10px 20px 100px;
+    padding: 10px 24px 100px;
 }
 
 .app-header {
@@ -243,8 +243,8 @@ body {
    ============================================ */
 .features-section {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
     margin-top: 16px;
     margin-bottom: 4px;
 }
@@ -297,14 +297,17 @@ body {
 }
 
 .footer-content {
-    max-width: 580px;
+    max-width: 1200px;
     margin: 0 auto;
-    padding: 40px 20px 24px;
+    padding: 40px 24px 24px;
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr;
+    gap: 30px;
 }
 
 .footer-section {
-    margin-bottom: 24px;
-    text-align: center;
+    margin-bottom: 0;
+    text-align: left;
 }
 
 .footer-title {
@@ -326,8 +329,8 @@ body {
 
 .footer-apis {
     display: flex;
-    justify-content: center;
-    gap: 12px;
+    justify-content: flex-start;
+    gap: 10px;
     flex-wrap: wrap;
 }
 
@@ -380,6 +383,7 @@ body {
     text-align: center;
     padding-top: 20px;
     border-top: 1px solid var(--border-card);
+    grid-column: 1 / -1;
 }
 
 .footer-bottom p {
@@ -508,7 +512,7 @@ body {
 
 /* Anime Cards */
 .home-card {
-    flex: 0 0 120px;
+    flex: 0 0 150px;
     scroll-snap-align: start;
     cursor: pointer;
     transition: all var(--transition);
@@ -526,7 +530,7 @@ body {
 
 .home-card img {
     width: 100%;
-    height: 160px;
+    height: 200px;
     object-fit: cover;
     display: block;
 }
@@ -554,8 +558,8 @@ body {
 /* Studio Grid */
 .studio-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
 }
 
 .studio-card {
@@ -618,6 +622,49 @@ body {
     padding: 20px;
     color: var(--text-muted);
     font-size: 0.82rem;
+    grid-column: 1 / -1;
+}
+
+.studio-back-btn,
+.studio-selected-name,
+.studio-grid>.home-scroll {
+    grid-column: 1 / -1;
+}
+
+@media (max-width: 768px) {
+    .app-container {
+        max-width: 100%;
+        padding: 10px 16px 100px;
+    }
+
+    .features-section {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .studio-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .home-card {
+        flex: 0 0 120px;
+    }
+
+    .home-card img {
+        height: 160px;
+    }
+
+    .footer-content {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+
+    .footer-section {
+        text-align: center;
+    }
+
+    .footer-apis {
+        justify-content: center;
+    }
 }
 
 @media (max-width: 480px) {

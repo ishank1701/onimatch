@@ -336,6 +336,7 @@ function goHome() {
     // Show home section
     homeSection.style.display = '';
     document.getElementById('features-section').style.display = '';
+    document.querySelector('.site-footer').style.display = '';
     // Hide quiz/similar/results/loading/error
     document.getElementById('tab-bar').classList.add('hidden');
     sectionQuiz.classList.remove('active');
@@ -359,6 +360,7 @@ function switchTab(tab) {
     // Hide home, show tab bar
     homeSection.style.display = 'none';
     document.getElementById('features-section').style.display = 'none';
+    document.querySelector('.site-footer').style.display = 'none';
     document.getElementById('tab-bar').classList.remove('hidden');
     // Toggle tab buttons
     tabQuiz.classList.toggle("active", tab === "quiz");
@@ -370,8 +372,9 @@ function switchTab(tab) {
     loadingContainer.classList.add("hidden");
     resultsContainer.classList.add("hidden");
     errorContainer.classList.add("hidden");
-    // Robot
+    // Re-render quiz step when switching to quiz
     if (tab === "quiz") {
+        renderStep(currentStep);
         setRobotExpression("idle");
         speechText.textContent = "Let's find your match! 🎯";
     } else {
@@ -426,7 +429,7 @@ async function loadHomeSection() {
     // Top Anime
     try {
         const topQuery = `query {
-            Page(perPage: 15) {
+            Page(perPage: 25) {
                 media(type: ANIME, sort: SCORE_DESC, isAdult: false) {
                     id title { romaji english } coverImage { large extraLarge }
                     averageScore episodes format
@@ -443,7 +446,7 @@ async function loadHomeSection() {
     // Currently Airing
     try {
         const airingQuery = `query {
-            Page(perPage: 15) {
+            Page(perPage: 25) {
                 media(type: ANIME, status: RELEASING, sort: POPULARITY_DESC, isAdult: false) {
                     id title { romaji english } coverImage { large extraLarge }
                     averageScore episodes format
@@ -460,7 +463,7 @@ async function loadHomeSection() {
     // Top Upcoming
     try {
         const upcomingQuery = `query {
-            Page(perPage: 15) {
+            Page(perPage: 25) {
                 media(type: ANIME, status: NOT_YET_RELEASED, sort: POPULARITY_DESC, isAdult: false) {
                     id title { romaji english } coverImage { large extraLarge }
                     averageScore episodes format
@@ -501,7 +504,7 @@ async function loadStudioAnime(studioId, studioName) {
         }`;
         const data = await anilistQuery(query, { studioId });
         const animes = data.Studio?.media?.nodes || [];
-        const top = animes.slice(0, 15);
+        const top = animes.slice(0, 25);
         studioGrid.innerHTML = `
             <button class="studio-back-btn" onclick="resetStudioGrid()">← Back to Studios</button>
             <h4 class="studio-selected-name">${studioName}</h4>
@@ -781,11 +784,11 @@ async function submitQuiz() {
         // Experience → sort order + minimum score
         let sortOrders, minScore;
         switch (expSel) {
-            case 0: sortOrders = ["POPULARITY_DESC"]; minScore = 70; break;
-            case 1: sortOrders = ["SCORE_DESC", "TRENDING_DESC"]; minScore = 72; break;
-            case 2: sortOrders = ["SCORE_DESC", "FAVOURITES_DESC"]; minScore = 74; break;
-            case 3: sortOrders = ["FAVOURITES_DESC", "SCORE_DESC"]; minScore = 76; break;
-            default: sortOrders = ["POPULARITY_DESC"]; minScore = 70;
+            case 0: sortOrders = ["POPULARITY_DESC", "TRENDING_DESC", "SCORE_DESC"]; minScore = 65; break;
+            case 1: sortOrders = ["SCORE_DESC", "TRENDING_DESC", "POPULARITY_DESC"]; minScore = 68; break;
+            case 2: sortOrders = ["SCORE_DESC", "FAVOURITES_DESC", "TRENDING_DESC"]; minScore = 70; break;
+            case 3: sortOrders = ["FAVOURITES_DESC", "SCORE_DESC", "TRENDING_DESC", "UPDATED_AT_DESC"]; minScore = 72; break;
+            default: sortOrders = ["POPULARITY_DESC", "TRENDING_DESC"]; minScore = 65;
         }
 
         // Execute AniList queries
@@ -796,7 +799,7 @@ async function submitQuiz() {
             const query = `
                 query ($genres: [String], $tags: [String], $sort: [MediaSort], $format: MediaFormat,
                        $epsGreater: Int, $epsLesser: Int, $minScore: Int) {
-                    Page(perPage: 25) {
+                    Page(perPage: 50) {
                         media(type: ANIME, genre_in: $genres, tag_in: $tags, sort: [$sort],
                               format: $format, episodes_greater: $epsGreater, episodes_lesser: $epsLesser,
                               averageScore_greater: $minScore, isAdult: false) {
@@ -846,7 +849,7 @@ async function submitQuiz() {
             try {
                 const fallbackQuery = `
                     query ($genres: [String]) {
-                        Page(perPage: 25) {
+                        Page(perPage: 50) {
                             media(type: ANIME, genre_in: $genres, sort: [POPULARITY_DESC], isAdult: false) {
                                 id title { romaji english }
                                 coverImage { large extraLarge }
