@@ -328,10 +328,38 @@ const pupilRight = document.getElementById("pupil-right");
 const speechText = document.getElementById("speech-text");
 
 // ============================================
-// TAB SWITCHING
+// TAB SWITCHING & NAVIGATION
 // ============================================
+const homeSection = document.getElementById("home-section");
+
+function goHome() {
+    // Show home section
+    homeSection.style.display = '';
+    document.getElementById('features-section').style.display = '';
+    // Hide quiz/similar/results/loading/error
+    document.getElementById('tab-bar').classList.add('hidden');
+    sectionQuiz.classList.remove('active');
+    sectionSimilar.classList.remove('active');
+    loadingContainer.classList.add('hidden');
+    resultsContainer.classList.add('hidden');
+    errorContainer.classList.add('hidden');
+    document.body.style.overflow = '';
+    // Reset quiz
+    currentStep = 0;
+    selections = Array(QUIZ_STEPS.length).fill(null);
+    renderStep(0);
+    clearSelectedAnime();
+    setRobotExpression('idle');
+    speechText.textContent = "Hey! Ready to find your next anime? 🏴\u200d☠️";
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
 function switchTab(tab) {
     activeTab = tab;
+    // Hide home, show tab bar
+    homeSection.style.display = 'none';
+    document.getElementById('features-section').style.display = 'none';
+    document.getElementById('tab-bar').classList.remove('hidden');
     // Toggle tab buttons
     tabQuiz.classList.toggle("active", tab === "quiz");
     tabSimilar.classList.toggle("active", tab === "similar");
@@ -342,8 +370,7 @@ function switchTab(tab) {
     loadingContainer.classList.add("hidden");
     resultsContainer.classList.add("hidden");
     errorContainer.classList.add("hidden");
-
-    // Robot speech
+    // Robot
     if (tab === "quiz") {
         setRobotExpression("idle");
         speechText.textContent = "Let's find your match! 🎯";
@@ -356,24 +383,147 @@ function switchTab(tab) {
 tabQuiz.addEventListener("click", () => switchTab("quiz"));
 tabSimilar.addEventListener("click", () => switchTab("similar"));
 
-// Home button — resets everything to initial state
-document.getElementById("btn-home").addEventListener("click", () => {
-    // Reset quiz
-    currentStep = 0;
-    selections = Array(QUIZ_STEPS.length).fill(null);
-    renderStep(0);
-    // Show features section
-    const feat = document.getElementById('features-section');
-    if (feat) feat.style.display = '';
-    // Reset tabs & panels
-    document.getElementById('tab-bar').style.display = '';
-    switchTab(activeTab === 'similar' ? 'similar' : 'quiz');
-    // Scroll to top
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    // Clear search state
-    clearSelectedAnime();
-    setRobotExpression('idle');
-});
+// Home button + logo click → go home
+document.getElementById("btn-home").addEventListener("click", goHome);
+document.querySelector(".hero-logo").addEventListener("click", goHome);
+document.querySelector(".hero-logo").style.cursor = "pointer";
+
+// CTA buttons
+document.getElementById("btn-cta-quiz").addEventListener("click", () => switchTab("quiz"));
+document.getElementById("btn-cta-similar").addEventListener("click", () => switchTab("similar"));
+
+// ============================================
+// HOMEPAGE DATA LOADING
+// ============================================
+const STUDIOS = [
+    { name: "Studio Ghibli", id: 21 },
+    { name: "MAPPA", id: 569 },
+    { name: "ufotable", id: 43 },
+    { name: "Wit Studio", id: 858 },
+    { name: "Bones", id: 4 },
+    { name: "Madhouse", id: 11 },
+    { name: "Kyoto Animation", id: 2 },
+    { name: "A-1 Pictures", id: 6 },
+    { name: "Toei Animation", id: 18 },
+    { name: "Sunrise", id: 14 }
+];
+
+function renderHomeCard(anime) {
+    const title = anime.title?.english || anime.title?.romaji || '';
+    const cover = anime.coverImage?.extraLarge || anime.coverImage?.large || '';
+    const score = anime.averageScore ? (anime.averageScore / 10).toFixed(1) : '';
+    const eps = anime.episodes ? `${anime.episodes} ep` : anime.format || '';
+    return `<div class="home-card" onclick="openAnimeDetail(null, '${escapeHTML(title).replace(/'/g, "\\'")}', ${anime.id})">
+        <img src="${cover}" alt="${escapeHTML(title)}" loading="lazy">
+        <div class="home-card-info">
+            <div class="home-card-title">${escapeHTML(title)}</div>
+            <div class="home-card-meta">${score ? '⭐ ' + score : ''} ${eps ? '• ' + eps : ''}</div>
+        </div>
+    </div>`;
+}
+
+async function loadHomeSection() {
+    // Top Anime
+    try {
+        const topQuery = `query {
+            Page(perPage: 15) {
+                media(type: ANIME, sort: SCORE_DESC, isAdult: false) {
+                    id title { romaji english } coverImage { large extraLarge }
+                    averageScore episodes format
+                }
+            }
+        }`;
+        const topData = await anilistQuery(topQuery);
+        const topEl = document.getElementById('home-top-anime');
+        if (topData.Page?.media) {
+            topEl.innerHTML = topData.Page.media.map(renderHomeCard).join('');
+        }
+    } catch (e) { console.warn("Failed to load top anime:", e); }
+
+    // Currently Airing
+    try {
+        const airingQuery = `query {
+            Page(perPage: 15) {
+                media(type: ANIME, status: RELEASING, sort: POPULARITY_DESC, isAdult: false) {
+                    id title { romaji english } coverImage { large extraLarge }
+                    averageScore episodes format
+                }
+            }
+        }`;
+        const airingData = await anilistQuery(airingQuery);
+        const airingEl = document.getElementById('home-airing');
+        if (airingData.Page?.media) {
+            airingEl.innerHTML = airingData.Page.media.map(renderHomeCard).join('');
+        }
+    } catch (e) { console.warn("Failed to load airing:", e); }
+
+    // Top Upcoming
+    try {
+        const upcomingQuery = `query {
+            Page(perPage: 15) {
+                media(type: ANIME, status: NOT_YET_RELEASED, sort: POPULARITY_DESC, isAdult: false) {
+                    id title { romaji english } coverImage { large extraLarge }
+                    averageScore episodes format
+                }
+            }
+        }`;
+        const upcomingData = await anilistQuery(upcomingQuery);
+        const upcomingEl = document.getElementById('home-upcoming');
+        if (upcomingData.Page?.media) {
+            upcomingEl.innerHTML = upcomingData.Page.media.map(renderHomeCard).join('');
+        }
+    } catch (e) { console.warn("Failed to load upcoming:", e); }
+
+    // Studio Collections
+    const studioGrid = document.getElementById('studio-grid');
+    studioGrid.innerHTML = STUDIOS.map(s => `
+        <div class="studio-card" onclick="loadStudioAnime(${s.id}, '${s.name}')">
+            <span class="studio-name">${s.name}</span>
+            <span class="studio-arrow">→</span>
+        </div>
+    `).join('');
+}
+
+async function loadStudioAnime(studioId, studioName) {
+    const studioGrid = document.getElementById('studio-grid');
+    // Show loading
+    studioGrid.innerHTML = `<div class="studio-loading">Loading ${studioName} anime...</div>`;
+    try {
+        const query = `query ($studioId: Int) {
+            Studio(id: $studioId) {
+                media(sort: FAVOURITES_DESC, isMain: true) {
+                    nodes {
+                        id title { romaji english } coverImage { large extraLarge }
+                        averageScore episodes format
+                    }
+                }
+            }
+        }`;
+        const data = await anilistQuery(query, { studioId });
+        const animes = data.Studio?.media?.nodes || [];
+        const top = animes.slice(0, 15);
+        studioGrid.innerHTML = `
+            <button class="studio-back-btn" onclick="resetStudioGrid()">← Back to Studios</button>
+            <h4 class="studio-selected-name">${studioName}</h4>
+            <div class="home-scroll">${top.map(renderHomeCard).join('')}</div>
+        `;
+    } catch (e) {
+        studioGrid.innerHTML = `<p style="color:var(--text-muted)">Failed to load. <button onclick="resetStudioGrid()">Back</button></p>`;
+    }
+}
+
+function resetStudioGrid() {
+    const studioGrid = document.getElementById('studio-grid');
+    studioGrid.innerHTML = STUDIOS.map(s => `
+        <div class="studio-card" onclick="loadStudioAnime(${s.id}, '${s.name}')">
+            <span class="studio-name">${s.name}</span>
+            <span class="studio-arrow">→</span>
+        </div>
+    `).join('');
+}
+
+// Load homepage on start
+loadHomeSection();
 
 // ============================================
 // ROBOT - Eye Tracking & Expressions

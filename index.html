@@ -66,13 +66,52 @@
                 <div class="feature-card">
                     <span class="feature-icon">⚡</span>
                     <h3>Multi-API Powered</h3>
-                    <p>Powered by AniList, Jikan & Kitsu APIs for the most accurate and comprehensive anime data</p>
+                    <p>Powered by AniList, Jikan &amp; Kitsu APIs for the most accurate and comprehensive anime data</p>
                 </div>
             </div>
         </header>
 
-        <!-- Tab Bar -->
-        <div class="tab-bar" id="tab-bar">
+        <!-- =============================== -->
+        <!-- HOME SECTION — Anime Discovery  -->
+        <!-- =============================== -->
+        <div class="home-section" id="home-section">
+            <!-- Hero CTA -->
+            <div class="home-cta">
+                <h2 class="home-cta-title">Find Your Perfect Anime ✨</h2>
+                <p class="home-cta-desc">Take our quiz or search for an anime you love</p>
+                <div class="home-cta-buttons">
+                    <button class="btn-cta-quiz" id="btn-cta-quiz">🎯 Take the Quiz</button>
+                    <button class="btn-cta-similar" id="btn-cta-similar">🔍 Find Similar</button>
+                </div>
+            </div>
+
+            <!-- Top Anime -->
+            <div class="home-row">
+                <h3 class="home-row-title">🏆 Top Anime of All Time</h3>
+                <div class="home-scroll" id="home-top-anime"></div>
+            </div>
+
+            <!-- Currently Airing -->
+            <div class="home-row">
+                <h3 class="home-row-title">📺 Currently Airing</h3>
+                <div class="home-scroll" id="home-airing"></div>
+            </div>
+
+            <!-- Top Upcoming -->
+            <div class="home-row">
+                <h3 class="home-row-title">🔮 Top Upcoming</h3>
+                <div class="home-scroll" id="home-upcoming"></div>
+            </div>
+
+            <!-- Studio Collections -->
+            <div class="home-row">
+                <h3 class="home-row-title">🎨 Studio Collections</h3>
+                <div class="studio-grid" id="studio-grid"></div>
+            </div>
+        </div>
+
+        <!-- Tab Bar (hidden on home, shown when quiz/similar active) -->
+        <div class="tab-bar hidden" id="tab-bar">
             <button class="tab-btn active" data-tab="quiz" id="tab-quiz">
                 <span class="tab-icon">🎯</span> Quiz Match
             </button>
