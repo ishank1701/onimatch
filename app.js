@@ -519,31 +519,127 @@ async function loadHomeSection() {
 }
 
 async function loadStudioAnime(studioId, studioName) {
-    const studioGrid = document.getElementById('studio-grid');
-    // Show loading
-    studioGrid.innerHTML = `<div class="studio-loading">Loading ${studioName} anime...</div>`;
+    // Hide other homepage sections, show studio full page
+    const homeSection = document.getElementById('home-section');
+    homeSection.innerHTML = `
+        <div class="studio-page">
+            <button class="studio-back-btn" onclick="exitStudioPage()">← Back to Home</button>
+            <h2 class="studio-page-title">🎨 ${studioName}</h2>
+            <p class="studio-page-desc">All anime produced by ${studioName}</p>
+            <div class="studio-page-loading">Loading all anime<span class="loading-dots"></span></div>
+            <div class="studio-anime-grid" id="studio-anime-grid"></div>
+        </div>
+    `;
+    document.getElementById('features-section').style.display = 'none';
+    document.querySelector('.site-footer').style.display = 'none';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
     try {
-        const query = `query ($studioId: Int) {
-            Studio(id: $studioId) {
-                media(sort: FAVOURITES_DESC, isMain: true) {
-                    nodes {
-                        id title { romaji english } coverImage { large extraLarge }
-                        averageScore episodes format
+        // Fetch ALL anime from this studio (paginated)
+        let page = 1;
+        let allAnime = [];
+        let hasMore = true;
+
+        while (hasMore && page <= 5) {
+            const query = `query ($studioId: Int, $page: Int) {
+                Studio(id: $studioId) {
+                    media(sort: FAVOURITES_DESC, isMain: true, page: $page, perPage: 50) {
+                        nodes {
+                            id title { romaji english } coverImage { large extraLarge }
+                            averageScore episodes format status seasonYear
+                        }
+                        pageInfo { hasNextPage }
                     }
                 }
-            }
-        }`;
-        const data = await anilistQuery(query, { studioId });
-        const animes = data.Studio?.media?.nodes || [];
-        const top = animes.slice(0, 25);
-        studioGrid.innerHTML = `
-            <button class="studio-back-btn" onclick="resetStudioGrid()">← Back to Studios</button>
-            <h4 class="studio-selected-name">${studioName}</h4>
-            <div class="home-scroll">${top.map(renderHomeCard).join('')}</div>
-        `;
+            }`;
+            const data = await anilistQuery(query, { studioId, page });
+            const media = data.Studio?.media;
+            if (media?.nodes) allAnime.push(...media.nodes);
+            hasMore = media?.pageInfo?.hasNextPage || false;
+            page++;
+        }
+
+        const grid = document.getElementById('studio-anime-grid');
+        const loadingEl = homeSection.querySelector('.studio-page-loading');
+        if (loadingEl) loadingEl.remove();
+
+        if (allAnime.length === 0) {
+            grid.innerHTML = '<p style="color:var(--text-muted);text-align:center">No anime found for this studio.</p>';
+            return;
+        }
+
+        // Update count
+        const descEl = homeSection.querySelector('.studio-page-desc');
+        if (descEl) descEl.textContent = `${allAnime.length} anime by ${studioName}`;
+
+        grid.innerHTML = allAnime.map(a => {
+            const title = a.title?.english || a.title?.romaji || '';
+            const cover = a.coverImage?.extraLarge || a.coverImage?.large || '';
+            const score = a.averageScore ? (a.averageScore / 10).toFixed(1) : '';
+            const eps = a.episodes ? `${a.episodes} ep` : a.format || '';
+            const year = a.seasonYear || '';
+            return `<div class="studio-anime-card" onclick="openAnimeDetail(null, '${escapeHTML(title).replace(/'/g, "\\'")}', ${a.id})">
+                <img src="${cover}" alt="${escapeHTML(title)}" loading="lazy">
+                <div class="studio-anime-info">
+                    <div class="studio-anime-title">${escapeHTML(title)}</div>
+                    <div class="studio-anime-meta">
+                        ${score ? '⭐ ' + score : ''} ${eps ? '• ' + eps : ''} ${year ? '• ' + year : ''}
+                    </div>
+                </div>
+            </div>`;
+        }).join('');
+
     } catch (e) {
-        studioGrid.innerHTML = `<p style="color:var(--text-muted)">Failed to load. <button onclick="resetStudioGrid()">Back</button></p>`;
+        const grid = document.getElementById('studio-anime-grid');
+        if (grid) grid.innerHTML = `<p style="color:var(--text-muted)">Failed to load. <button onclick="exitStudioPage()">Back</button></p>`;
     }
+}
+
+// Store original home HTML for restoration
+let originalHomeHTML = '';
+// Capture right away (script runs after DOM is parsed)
+setTimeout(() => {
+    originalHomeHTML = document.getElementById('home-section')?.innerHTML || '';
+}, 100);
+
+function exitStudioPage() {
+    const homeSection = document.getElementById('home-section');
+    // Rebuild original home HTML structure
+    homeSection.innerHTML = `
+        <div class="home-cta">
+            <h2 class="home-cta-title">Find Your Perfect Anime ✨</h2>
+            <p class="home-cta-desc">Take our quiz or search for an anime you love</p>
+            <div class="home-cta-buttons">
+                <button class="btn-cta-quiz" id="btn-cta-quiz">🎯 Take the Quiz</button>
+                <button class="btn-cta-similar" id="btn-cta-similar">🔍 Find Similar</button>
+            </div>
+        </div>
+        <div class="home-row">
+            <h3 class="home-row-title">🏆 Top Anime of All Time</h3>
+            <div class="home-scroll" id="home-top-anime"></div>
+        </div>
+        <div class="home-row">
+            <h3 class="home-row-title">📺 Currently Airing</h3>
+            <div class="home-scroll" id="home-airing"></div>
+        </div>
+        <div class="home-row">
+            <h3 class="home-row-title">🔮 Top Upcoming</h3>
+            <div class="home-scroll" id="home-upcoming"></div>
+        </div>
+        <div class="home-row">
+            <h3 class="home-row-title">🎨 Studio Collections</h3>
+            <div class="studio-grid" id="studio-grid"></div>
+        </div>
+    `;
+    // Re-bind CTA buttons
+    document.getElementById('btn-cta-quiz').addEventListener('click', () => switchTab('quiz'));
+    document.getElementById('btn-cta-similar').addEventListener('click', () => switchTab('similar'));
+    // Show footer & features
+    document.getElementById('features-section').style.display = '';
+    document.querySelector('.site-footer').style.display = '';
+    // Reload data
+    loadHomeSection();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function resetStudioGrid() {

@@ -631,6 +631,83 @@ body {
     grid-column: 1 / -1;
 }
 
+/* Studio Full Page */
+.studio-page {
+    padding: 10px 0;
+}
+
+.studio-page-title {
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    font-weight: 900;
+    background: var(--gradient-main);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin: 10px 0 4px;
+}
+
+.studio-page-desc {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    margin-bottom: 20px;
+}
+
+.studio-page-loading {
+    text-align: center;
+    padding: 40px;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.studio-anime-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 14px;
+}
+
+.studio-anime-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-card);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    cursor: pointer;
+    transition: all var(--transition);
+}
+
+.studio-anime-card:hover {
+    transform: translateY(-4px);
+    border-color: var(--border-glow);
+    box-shadow: var(--shadow-neon);
+}
+
+.studio-anime-card img {
+    width: 100%;
+    height: 220px;
+    object-fit: cover;
+    display: block;
+}
+
+.studio-anime-info {
+    padding: 8px 10px 10px;
+}
+
+.studio-anime-title {
+    font-family: var(--font-display);
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 3px;
+}
+
+.studio-anime-meta {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+}
+
 @media (max-width: 768px) {
     .app-container {
         max-width: 100%;
@@ -643,6 +720,11 @@ body {
 
     .studio-grid {
         grid-template-columns: 1fr 1fr;
+    }
+
+    .studio-anime-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
     }
 
     .home-card {
@@ -674,6 +756,11 @@ body {
 
     .studio-grid {
         grid-template-columns: 1fr;
+    }
+
+    .studio-anime-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
     }
 
     .home-card {
