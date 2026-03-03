@@ -176,6 +176,37 @@ async function fetchAnimeDetailsAniList(title) {
     return data.Media;
 }
 
+async function fetchAnimeDetailsByIdAniList(id) {
+    const query = `
+        query ($id: Int) {
+            Media(id: $id, type: ANIME) {
+                id
+                title { romaji english native }
+                description(asHtml: false)
+                coverImage { extraLarge large }
+                bannerImage
+                trailer { id site thumbnail }
+                episodes
+                duration
+                format
+                status
+                seasonYear
+                season
+                averageScore
+                meanScore
+                popularity
+                genres
+                studios(isMain: true) { nodes { name } }
+                source
+                startDate { year month day }
+                endDate { year month day }
+            }
+        }
+    `;
+    const data = await anilistQuery(query, { id });
+    return data.Media;
+}
+
 async function fetchCoverImagesAniList(animeList) {
     const promises = animeList.map(async (anime, i) => {
         if (anime.coverImage) return; // Already has cover
@@ -1102,9 +1133,18 @@ function renderResults(animeList, startIndex) {
 // ============================================
 // ANIME DETAIL MODAL
 // ============================================
-async function openAnimeDetail(index) {
-    const anime = allRecommendations[index];
-    if (!anime) return;
+async function openAnimeDetail(index, directTitle, directAnilistId) {
+    let anime;
+    let fetchById = false;
+
+    if (directAnilistId) {
+        // Called from homepage card — use anilist ID directly
+        anime = { title: directTitle || '', anilistId: directAnilistId };
+        fetchById = true;
+    } else {
+        anime = allRecommendations[index];
+        if (!anime) return;
+    }
 
     // Create modal if it doesn't exist
     let modal = document.getElementById('anime-detail-modal');
@@ -1127,7 +1167,9 @@ async function openAnimeDetail(index) {
 
     try {
         // Fetch full details from AniList
-        const details = await fetchAnimeDetailsAniList(anime.title);
+        const details = fetchById
+            ? await fetchAnimeDetailsByIdAniList(directAnilistId)
+            : await fetchAnimeDetailsAniList(anime.title);
 
         const title = details.title?.english || details.title?.romaji || anime.title;
         const desc = details.description ? details.description.replace(/<[^>]*>/g, '') : anime.synopsis;
