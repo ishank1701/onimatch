@@ -456,8 +456,62 @@ function completeRunnerAnimation() {
 function stopRunnerAnimation() { clearInterval(loadingInterval); }
 
 // ============================================
-// QUIZ SUBMIT
+// QUIZ SUBMIT — AniList Powered (No AI needed!)
 // ============================================
+
+// Map quiz choices to AniList filters
+const MOOD_TO_TAGS = {
+    0: ["Tragedy", "Emotional", "Romance"],
+    1: ["Shounen", "Super Power", "Battle Royale"],
+    2: ["Iyashikei", "Countryside", "Cute Girls Doing Cute Things"],
+    3: ["Philosophy", "Surreal", "Dystopia"],
+    4: ["Parody", "Satire", "Slapstick"],
+    5: ["Isekai", "Travel", "Cultivation"],
+    6: ["Ecchi", "Harem", "Female Harem"],
+    7: ["Revenge", "Anti-Hero", "Villainess"]
+};
+
+const MOOD_TO_GENRES = {
+    0: ["Drama", "Romance"],
+    1: ["Action"],
+    2: ["Slice of Life"],
+    3: ["Psychological", "Sci-Fi"],
+    4: ["Comedy"],
+    5: ["Adventure", "Fantasy"],
+    6: ["Ecchi", "Romance"],
+    7: ["Action", "Drama"]
+};
+
+const GENRE_MAP = {
+    0: ["Action"],
+    1: ["Romance"],
+    2: ["Horror", "Thriller"],
+    3: ["Fantasy"],
+    4: ["Sci-Fi", "Mecha"],
+    5: ["Slice of Life"],
+    6: ["Psychological"],
+    7: ["Sports"],
+    8: ["Supernatural"],
+    9: ["Mystery"],
+    10: ["Action", "Drama"],
+    11: ["Comedy"],
+    12: ["Ecchi"],
+    13: ["Music"],
+    14: ["Romance", "Comedy"],
+    15: ["Drama"]
+};
+
+const THEME_TO_TAGS = {
+    0: ["Redemption", "Atonement"],
+    1: ["Revenge", "Warfare"],
+    2: ["Friendship", "Ensemble Cast", "Teams"],
+    3: ["Gore", "Seinen", "Violence"],
+    4: ["Coming of Age", "Youth"],
+    5: ["Conspiracy", "Plot Twist", "Mind Games"],
+    6: ["Love Triangle", "Couples", "Romance"],
+    7: ["Survival", "Strategy Game", "War"]
+};
+
 async function submitQuiz() {
     currentMode = "quiz";
     document.getElementById("tab-bar").style.display = "none";
@@ -466,21 +520,151 @@ async function submitQuiz() {
     startRunnerAnimation();
     setRobotExpression("searching");
 
-    // Build selections text
-    const selTexts = QUIZ_STEPS.map((step, i) => {
-        const sel = selections[i];
-        if (Array.isArray(sel)) {
-            return `${step.key}: ${sel.map(idx => step.choices[idx].label).join(", ")}`;
-        } else {
-            return `${step.key}: ${step.choices[sel].label}`;
+    try {
+        const moodSel = selections[0];
+        const genreSel = selections[1];
+        const epsSel = selections[2];
+        const themeSel = selections[3];
+        const expSel = selections[4];
+
+        // Build genre filter
+        let genres = new Set();
+        if (Array.isArray(moodSel)) moodSel.forEach(i => (MOOD_TO_GENRES[i] || []).forEach(g => genres.add(g)));
+        if (Array.isArray(genreSel)) genreSel.forEach(i => (GENRE_MAP[i] || []).forEach(g => genres.add(g)));
+        genres = [...genres];
+
+        // Build tag filter
+        let tags = [];
+        if (Array.isArray(moodSel)) moodSel.forEach(i => tags.push(...(MOOD_TO_TAGS[i] || [])));
+        if (Array.isArray(themeSel)) themeSel.forEach(i => tags.push(...(THEME_TO_TAGS[i] || [])));
+
+        // Build episode/format filter
+        let formatFilter = null, episodesGreater = null, episodesLesser = null;
+        switch (epsSel) {
+            case 0: formatFilter = "MOVIE"; break;
+            case 1: episodesLesser = 13; break;
+            case 2: episodesGreater = 11; episodesLesser = 27; break;
+            case 3: episodesGreater = 25; episodesLesser = 53; break;
+            case 4: episodesGreater = 49; episodesLesser = 150; break;
+            case 5: episodesGreater = 100; break;
         }
-    });
 
-    const userMessage = `User preferences:\n${selTexts.join("\n")}`;
+        // Experience → sort order + minimum score
+        let sortOrders, minScore;
+        switch (expSel) {
+            case 0: sortOrders = ["POPULARITY_DESC"]; minScore = 70; break;
+            case 1: sortOrders = ["SCORE_DESC", "TRENDING_DESC"]; minScore = 72; break;
+            case 2: sortOrders = ["SCORE_DESC", "FAVOURITES_DESC"]; minScore = 74; break;
+            case 3: sortOrders = ["FAVOURITES_DESC", "SCORE_DESC"]; minScore = 76; break;
+            default: sortOrders = ["POPULARITY_DESC"]; minScore = 70;
+        }
 
-    const systemPrompt = `You are an anime recommender. Recommend exactly 25 anime matching the user's taste. Return ONLY a JSON array, no markdown. Each item: {"title":string,"synopsis":string(1 sentence),"episodes":string,"rating":number,"genres":[strings],"why":string(1 sentence)}. Include variety. All 25 UNIQUE.`;
+        // Execute AniList queries
+        const allResults = [];
+        const seenIds = new Set();
 
-    await callAPIAndShowResults(systemPrompt, userMessage);
+        for (const sort of sortOrders) {
+            const query = `
+                query ($genres: [String], $tags: [String], $sort: [MediaSort], $format: MediaFormat,
+                       $epsGreater: Int, $epsLesser: Int, $minScore: Int) {
+                    Page(perPage: 25) {
+                        media(type: ANIME, genre_in: $genres, tag_in: $tags, sort: [$sort],
+                              format: $format, episodes_greater: $epsGreater, episodes_lesser: $epsLesser,
+                              averageScore_greater: $minScore, isAdult: false) {
+                            id
+                            title { romaji english }
+                            coverImage { large extraLarge }
+                            format seasonYear averageScore episodes genres
+                            description(asHtml: false)
+                        }
+                    }
+                }
+            `;
+            const variables = {};
+            if (genres.length > 0) variables.genres = genres;
+            if (tags.length > 0) variables.tags = tags;
+            variables.sort = sort;
+            if (formatFilter) variables.format = formatFilter;
+            if (episodesGreater !== null) variables.epsGreater = episodesGreater;
+            if (episodesLesser !== null) variables.epsLesser = episodesLesser;
+            if (minScore) variables.minScore = minScore;
+
+            try {
+                const data = await anilistQuery(query, variables);
+                if (data.Page?.media) {
+                    for (const m of data.Page.media) {
+                        if (!seenIds.has(m.id)) {
+                            seenIds.add(m.id);
+                            const cleanDesc = m.description ? m.description.replace(/<[^>]*>/g, '').substring(0, 150) : '';
+                            allResults.push({
+                                title: m.title.english || m.title.romaji,
+                                synopsis: cleanDesc || "No description available.",
+                                episodes: m.episodes ? `${m.episodes} eps` : m.format || "?",
+                                rating: m.averageScore ? (m.averageScore / 10).toFixed(1) : "N/A",
+                                genres: m.genres || [],
+                                why: `Matches your ${genres[0] || 'selected'} taste • ⭐ ${m.averageScore ? m.averageScore + '%' : 'N/A'} on AniList`,
+                                coverImage: m.coverImage?.extraLarge || m.coverImage?.large || null,
+                                anilistId: m.id
+                            });
+                        }
+                    }
+                }
+            } catch (e) { console.warn("AniList query failed:", e.message); }
+        }
+
+        // Fallback: broader search if not enough results
+        if (allResults.length < 10 && genres.length > 0) {
+            try {
+                const fallbackQuery = `
+                    query ($genres: [String]) {
+                        Page(perPage: 25) {
+                            media(type: ANIME, genre_in: $genres, sort: [POPULARITY_DESC], isAdult: false) {
+                                id title { romaji english }
+                                coverImage { large extraLarge }
+                                format seasonYear averageScore episodes genres
+                                description(asHtml: false)
+                            }
+                        }
+                    }
+                `;
+                const data = await anilistQuery(fallbackQuery, { genres });
+                if (data.Page?.media) {
+                    for (const m of data.Page.media) {
+                        if (!seenIds.has(m.id)) {
+                            seenIds.add(m.id);
+                            const cleanDesc = m.description ? m.description.replace(/<[^>]*>/g, '').substring(0, 150) : '';
+                            allResults.push({
+                                title: m.title.english || m.title.romaji,
+                                synopsis: cleanDesc || "No description available.",
+                                episodes: m.episodes ? `${m.episodes} eps` : m.format || "?",
+                                rating: m.averageScore ? (m.averageScore / 10).toFixed(1) : "N/A",
+                                genres: m.genres || [],
+                                why: `Popular ${genres[0] || ''} anime • ⭐ ${m.averageScore ? m.averageScore + '%' : 'N/A'} on AniList`,
+                                coverImage: m.coverImage?.extraLarge || m.coverImage?.large || null,
+                                anilistId: m.id
+                            });
+                        }
+                    }
+                }
+            } catch (e) { console.warn("Fallback query failed:", e.message); }
+        }
+
+        if (allResults.length === 0) throw new Error("No anime found matching your preferences. Try different options!");
+
+        allRecommendations = allResults;
+        completeRunnerAnimation();
+        await new Promise(r => setTimeout(r, 600));
+        currentPage = 1;
+        showResultsPage(1);
+        setRobotExpression("party");
+        setTimeout(() => setRobotExpression("idle"), 4000);
+
+    } catch (err) {
+        console.error("Quiz Error:", err);
+        stopRunnerAnimation();
+        setRobotExpression("sad");
+        showError(err.message);
+    }
 }
 
 // ============================================
@@ -619,75 +803,6 @@ async function submitSimilar() {
 
     } catch (err) {
         console.error("AniList Similar Error:", err);
-        stopRunnerAnimation();
-        setRobotExpression("sad");
-        showError(err.message);
-    }
-}
-
-// ============================================
-// SHARED API CALL + RESULTS
-// ============================================
-async function callAPIAndShowResults(systemPrompt, userMessage) {
-    try {
-        const response = await fetch("/.netlify/functions/recommend", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ systemPrompt, userMessage })
-        });
-
-        if (!response.ok) throw new Error(`API error ${response.status}`);
-
-        const data = await response.json();
-        const textContent = data.choices?.[0]?.message?.content;
-        if (!textContent) throw new Error("No text in response");
-
-        let recommendations;
-        try {
-            let jsonStr = textContent.trim().replace(/```json\s*/g, "").replace(/```\s*/g, "");
-            const jsonMatch = jsonStr.match(/\[[\s\S]*\]/);
-            if (jsonMatch) jsonStr = jsonMatch[0];
-            recommendations = JSON.parse(jsonStr);
-        } catch (e) {
-            // Try to recover truncated JSON
-            console.warn("Initial parse failed, attempting recovery...", e.message);
-            try {
-                let jsonStr = textContent.trim().replace(/```json\s*/g, "").replace(/```\s*/g, "");
-                // Find the start of the array
-                const arrStart = jsonStr.indexOf('[');
-                if (arrStart === -1) throw new Error("No JSON array found");
-                jsonStr = jsonStr.substring(arrStart);
-                // Try to close truncated JSON: remove last incomplete object and close array
-                const lastComplete = jsonStr.lastIndexOf('}');
-                if (lastComplete > 0) {
-                    jsonStr = jsonStr.substring(0, lastComplete + 1) + ']';
-                }
-                recommendations = JSON.parse(jsonStr);
-            } catch (e2) {
-                console.error("Raw AI response:", textContent);
-                throw new Error("Failed to parse recommendations");
-            }
-        }
-
-        if (!Array.isArray(recommendations) || recommendations.length === 0) throw new Error("Invalid format");
-
-        // Fetch covers for first batch via AniList
-        await fetchCoverImagesAniList(recommendations.slice(0, 10));
-        allRecommendations = recommendations;
-
-        completeRunnerAnimation();
-        await new Promise(r => setTimeout(r, 600));
-
-        currentPage = 1;
-        showResultsPage(1);
-        setRobotExpression("party");
-        setTimeout(() => setRobotExpression("idle"), 4000);
-
-        // Fetch remaining covers in background
-        fetchCoverImagesAniList(recommendations.slice(10));
-
-    } catch (err) {
-        console.error("ONIMATCH Error:", err);
         stopRunnerAnimation();
         setRobotExpression("sad");
         showError(err.message);
