@@ -1,9 +1,69 @@
 /* ============================================
-   ONIMATCH V2 — Quiz + Similar Anime + Robot
-   AniList GraphQL + OpenRouter AI
+   ONIMATCH V3 — Fully Static, Multi-API
+   AniList + Jikan + Kitsu (No AI / No Server)
    ============================================ */
 
 const ANILIST_URL = "https://graphql.anilist.co";
+const JIKAN_URL = "https://api.jikan.moe/v4";
+const KITSU_URL = "https://kitsu.io/api/edge";
+
+// ============================================
+// JIKAN (MyAnimeList) HELPERS
+// ============================================
+async function searchAnimeJikan(query) {
+    try {
+        const res = await fetch(`${JIKAN_URL}/anime?q=${encodeURIComponent(query)}&limit=5&sfw=true`);
+        if (!res.ok) return [];
+        const data = await res.json();
+        return (data.data || []).map(a => ({
+            title: a.title_english || a.title,
+            coverImage: a.images?.jpg?.large_image_url || a.images?.jpg?.image_url || null,
+            malId: a.mal_id,
+            episodes: a.episodes,
+            score: a.score,
+            genres: (a.genres || []).map(g => g.name)
+        }));
+    } catch { return []; }
+}
+
+// ============================================
+// KITSU HELPERS
+// ============================================
+async function searchAnimeKitsu(query) {
+    try {
+        const res = await fetch(`${KITSU_URL}/anime?filter[text]=${encodeURIComponent(query)}&page[limit]=5`);
+        if (!res.ok) return [];
+        const data = await res.json();
+        return (data.data || []).map(a => ({
+            title: a.attributes.titles?.en || a.attributes.canonicalTitle,
+            coverImage: a.attributes.posterImage?.large || a.attributes.posterImage?.original || null,
+            kitsuId: a.id,
+            episodes: a.attributes.episodeCount,
+            score: a.attributes.averageRating ? (parseFloat(a.attributes.averageRating) / 10).toFixed(1) : null
+        }));
+    } catch { return []; }
+}
+
+// Multi-API cover image fallback
+async function fetchCoverFallback(anime) {
+    if (anime.coverImage) return;
+    // Try Jikan
+    try {
+        const jResults = await searchAnimeJikan(anime.title);
+        if (jResults.length > 0 && jResults[0].coverImage) {
+            anime.coverImage = jResults[0].coverImage;
+            return;
+        }
+    } catch { }
+    // Try Kitsu
+    try {
+        const kResults = await searchAnimeKitsu(anime.title);
+        if (kResults.length > 0 && kResults[0].coverImage) {
+            anime.coverImage = kResults[0].coverImage;
+            return;
+        }
+    } catch { }
+}
 
 // ============================================
 // ANILIST GRAPHQL HELPERS
@@ -295,6 +355,25 @@ function switchTab(tab) {
 
 tabQuiz.addEventListener("click", () => switchTab("quiz"));
 tabSimilar.addEventListener("click", () => switchTab("similar"));
+
+// Home button — resets everything to initial state
+document.getElementById("btn-home").addEventListener("click", () => {
+    // Reset quiz
+    currentStep = 0;
+    selections = Array(QUIZ_STEPS.length).fill(null);
+    renderStep(0);
+    // Show features section
+    const feat = document.getElementById('features-section');
+    if (feat) feat.style.display = '';
+    // Reset tabs & panels
+    document.getElementById('tab-bar').style.display = '';
+    switchTab(activeTab === 'similar' ? 'similar' : 'quiz');
+    // Scroll to top
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    // Clear search state
+    clearSelectedAnime();
+    setRobotExpression('idle');
+});
 
 // ============================================
 // ROBOT - Eye Tracking & Expressions

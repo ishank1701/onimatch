@@ -32,10 +32,43 @@
     <div class="app-container">
         <!-- Header -->
         <header class="app-header">
-            <div class="hero-logo">
-                <img src="image 6.png" alt="ONIMATCH" class="hero-img">
+            <div class="header-row">
+                <button class="home-btn" id="btn-home" title="Home">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                        <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                    </svg>
+                </button>
+                <div class="hero-logo">
+                    <img src="image 6.png" alt="ONIMATCH" class="hero-img">
+                </div>
             </div>
             <p class="site-tagline">Get personalized anime recommendations based on your mood, genre & taste</p>
+
+            <!-- Features Section -->
+            <div class="features-section" id="features-section">
+                <div class="feature-card">
+                    <span class="feature-icon">🎯</span>
+                    <h3>Smart Quiz</h3>
+                    <p>Answer 5 questions about your mood, genre & taste — get 25+ perfect matches instantly</p>
+                </div>
+                <div class="feature-card">
+                    <span class="feature-icon">🔍</span>
+                    <h3>Find Similar</h3>
+                    <p>Love an anime? Search it and discover 50+ similar titles recommended by the AniList community</p>
+                </div>
+                <div class="feature-card">
+                    <span class="feature-icon">🎬</span>
+                    <h3>Trailers & Details</h3>
+                    <p>Click any recommendation to watch trailers, read descriptions, and see full details</p>
+                </div>
+                <div class="feature-card">
+                    <span class="feature-icon">⚡</span>
+                    <h3>Multi-API Powered</h3>
+                    <p>Powered by AniList, Jikan & Kitsu APIs for the most accurate and comprehensive anime data</p>
+                </div>
+            </div>
         </header>
 
         <!-- Tab Bar -->
@@ -129,7 +162,6 @@
             <p class="results-subtitle" id="results-count"></p>
             <div class="results-grid" id="results-grid"></div>
             <div class="pagination" id="pagination"></div>
-            <button class="btn-action btn-try-again" id="btn-try-again">⟳ Start Over</button>
         </div>
 
         <!-- Error State -->
@@ -183,6 +215,35 @@
     </div>
 
     <script src="app.js"></script>
+
+    <!-- Footer -->
+    <footer class="site-footer">
+        <div class="footer-content">
+            <div class="footer-section">
+                <h3 class="footer-title">ONIMATCH</h3>
+                <p class="footer-desc">Your AI-free anime recommendation engine. Discover your next favorite anime
+                    through our smart quiz or find similar titles — all powered by community data from the world's best
+                    anime databases.</p>
+            </div>
+            <div class="footer-section">
+                <h3 class="footer-title">Powered By</h3>
+                <div class="footer-apis">
+                    <a href="https://anilist.co" target="_blank" rel="noopener">AniList</a>
+                    <a href="https://jikan.moe" target="_blank" rel="noopener">Jikan (MAL)</a>
+                    <a href="https://kitsu.io" target="_blank" rel="noopener">Kitsu</a>
+                </div>
+            </div>
+            <div class="footer-section">
+                <h3 class="footer-title">Contact & Feedback</h3>
+                <p class="footer-contact">Found a bug? Have a suggestion? Reach out!</p>
+                <a href="mailto:ishanksachan1701@gmail.com" class="footer-email">📧 ishanksachan1701@gmail.com</a>
+            </div>
+            <div class="footer-bottom">
+                <p>Made with ❤️ for anime fans everywhere</p>
+                <p class="footer-copy">© 2025 ONIMATCH. All anime data belongs to their respective owners.</p>
+            </div>
+        </div>
+    </footer>
 </body>
 
 </html>
