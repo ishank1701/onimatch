@@ -871,6 +871,155 @@ const THEME_TO_TAGS = {
     7: ["Survival", "Strategy Game", "War"]
 };
 
+async function fetchQuizResults() {
+    const moodSel = selections[0];
+    const genreSel = selections[1];
+    const epsSel = selections[2];
+    const themeSel = selections[3];
+    const expSel = selections[4];
+
+    // Build genre filter
+    let genres = new Set();
+    const moodArr = Array.isArray(moodSel) ? moodSel : (moodSel !== undefined ? [moodSel] : []);
+    const genreArr = Array.isArray(genreSel) ? genreSel : (genreSel !== undefined ? [genreSel] : []);
+    moodArr.forEach(i => (MOOD_TO_GENRES[i] || []).forEach(g => genres.add(g)));
+    genreArr.forEach(i => (GENRE_MAP[i] || []).forEach(g => genres.add(g)));
+    genres = [...genres];
+
+    // Build tag filter
+    let tags = [];
+    const moodTagArr = Array.isArray(moodSel) ? moodSel : (moodSel !== undefined ? [moodSel] : []);
+    const themeArr = Array.isArray(themeSel) ? themeSel : (themeSel !== undefined ? [themeSel] : []);
+    moodTagArr.forEach(i => tags.push(...(MOOD_TO_TAGS[i] || [])));
+    themeArr.forEach(i => tags.push(...(THEME_TO_TAGS[i] || [])));
+
+    // Build episode/format filter
+    let formatFilter = null, episodesGreater = null, episodesLesser = null;
+    const epsVal = Array.isArray(epsSel) ? epsSel[0] : epsSel;
+    switch (epsVal) {
+        case 0: formatFilter = "MOVIE"; break;
+        case 1: episodesLesser = 13; break;
+        case 2: episodesGreater = 11; episodesLesser = 27; break;
+        case 3: episodesGreater = 25; episodesLesser = 53; break;
+        case 4: episodesGreater = 49; episodesLesser = 150; break;
+        case 5: episodesGreater = 100; break;
+    }
+
+    // Experience → sort order + minimum score
+    const expVal = Array.isArray(expSel) ? expSel[0] : expSel;
+    let sortOrders, minScore;
+    switch (expVal) {
+        case 0: sortOrders = ["POPULARITY_DESC", "TRENDING_DESC", "SCORE_DESC"]; minScore = 65; break;
+        case 1: sortOrders = ["SCORE_DESC", "TRENDING_DESC", "POPULARITY_DESC"]; minScore = 68; break;
+        case 2: sortOrders = ["SCORE_DESC", "FAVOURITES_DESC", "TRENDING_DESC"]; minScore = 70; break;
+        case 3: sortOrders = ["FAVOURITES_DESC", "SCORE_DESC", "TRENDING_DESC", "UPDATED_AT_DESC"]; minScore = 72; break;
+        default: sortOrders = ["POPULARITY_DESC", "TRENDING_DESC"]; minScore = 65;
+    }
+
+    // Execute AniList queries
+    const allResults = [];
+    const seenIds = new Set();
+
+    for (const sort of sortOrders) {
+        let queryArgs = `$sort: [MediaSort], $format: MediaFormat, $epsGreater: Int, $epsLesser: Int, $minScore: Int`;
+        let mediaArgs = `type: ANIME, sort: [$sort], format: $format, episodes_greater: $epsGreater, episodes_lesser: $epsLesser, averageScore_greater: $minScore, isAdult: false`;
+
+        if (genres.length > 0) {
+            queryArgs += `, $genres: [String]`;
+            mediaArgs += `, genre_in: $genres`;
+        }
+        if (tags.length > 0) {
+            queryArgs += `, $tags: [String]`;
+            mediaArgs += `, tag_in: $tags`;
+        }
+
+        const query = `
+            query (${queryArgs}) {
+                Page(perPage: 50) {
+                    media(${mediaArgs}) {
+                        id
+                        title { romaji english }
+                        coverImage { large extraLarge }
+                        format seasonYear averageScore episodes genres
+                        description(asHtml: false)
+                    }
+                }
+            }
+        `;
+
+        const variables = {};
+        if (genres.length > 0) variables.genres = genres;
+        if (tags.length > 0) variables.tags = tags;
+        variables.sort = sort;
+        if (formatFilter) variables.format = formatFilter;
+        if (episodesGreater !== null) variables.epsGreater = episodesGreater;
+        if (episodesLesser !== null) variables.epsLesser = episodesLesser;
+        if (minScore) variables.minScore = minScore;
+
+        try {
+            const data = await anilistQuery(query, variables);
+            if (data.Page?.media) {
+                for (const m of data.Page.media) {
+                    if (!seenIds.has(m.id)) {
+                        seenIds.add(m.id);
+                        const cleanDesc = m.description ? m.description.replace(/<[^>]*>/g, '').substring(0, 150) : '';
+                        allResults.push({
+                            title: m.title.english || m.title.romaji,
+                            synopsis: cleanDesc || "No description available.",
+                            episodes: m.episodes ? `${m.episodes} eps` : m.format || "?",
+                            rating: m.averageScore ? (m.averageScore / 10).toFixed(1) : "N/A",
+                            genres: m.genres || [],
+                            why: `Matches your ${genres[0] || 'selected'} taste • ⭐ ${m.averageScore ? m.averageScore + '%' : 'N/A'} on AniList`,
+                            coverImage: m.coverImage?.extraLarge || m.coverImage?.large || null,
+                            anilistId: m.id
+                        });
+                    }
+                }
+            }
+        } catch (e) { console.warn("AniList query failed:", e.message); }
+    }
+
+    // Fallback: broader search if not enough results
+    if (allResults.length < 10 && genres.length > 0) {
+        try {
+            const fallbackQuery = `
+                query ($genres: [String]) {
+                    Page(perPage: 50) {
+                        media(type: ANIME, genre_in: $genres, sort: [POPULARITY_DESC], isAdult: false) {
+                            id title { romaji english }
+                            coverImage { large extraLarge }
+                            format seasonYear averageScore episodes genres
+                            description(asHtml: false)
+                        }
+                    }
+                }
+            `;
+            const data = await anilistQuery(fallbackQuery, { genres });
+            if (data.Page?.media) {
+                for (const m of data.Page.media) {
+                    if (!seenIds.has(m.id)) {
+                        seenIds.add(m.id);
+                        const cleanDesc = m.description ? m.description.replace(/<[^>]*>/g, '').substring(0, 150) : '';
+                        allResults.push({
+                            title: m.title.english || m.title.romaji,
+                            synopsis: cleanDesc || "No description available.",
+                            episodes: m.episodes ? `${m.episodes} eps` : m.format || "?",
+                            rating: m.averageScore ? (m.averageScore / 10).toFixed(1) : "N/A",
+                            genres: m.genres || [],
+                            why: `Popular ${genres[0] || ''} anime • ⭐ ${m.averageScore ? m.averageScore + '%' : 'N/A'} on AniList`,
+                            coverImage: m.coverImage?.extraLarge || m.coverImage?.large || null,
+                            anilistId: m.id
+                        });
+                    }
+                }
+            }
+        } catch (e) { console.warn("Fallback query failed:", e.message); }
+    }
+
+    if (allResults.length === 0) throw new Error("No anime found matching your preferences. Try different options!");
+    return allResults;
+}
+
 async function submitQuiz() {
     currentMode = "quiz";
     document.getElementById("tab-bar").style.display = "none";
@@ -880,137 +1029,7 @@ async function submitQuiz() {
     setRobotExpression("searching");
 
     try {
-        const moodSel = selections[0];
-        const genreSel = selections[1];
-        const epsSel = selections[2];
-        const themeSel = selections[3];
-        const expSel = selections[4];
-
-        // Build genre filter
-        let genres = new Set();
-        if (Array.isArray(moodSel)) moodSel.forEach(i => (MOOD_TO_GENRES[i] || []).forEach(g => genres.add(g)));
-        if (Array.isArray(genreSel)) genreSel.forEach(i => (GENRE_MAP[i] || []).forEach(g => genres.add(g)));
-        genres = [...genres];
-
-        // Build tag filter
-        let tags = [];
-        if (Array.isArray(moodSel)) moodSel.forEach(i => tags.push(...(MOOD_TO_TAGS[i] || [])));
-        if (Array.isArray(themeSel)) themeSel.forEach(i => tags.push(...(THEME_TO_TAGS[i] || [])));
-
-        // Build episode/format filter
-        let formatFilter = null, episodesGreater = null, episodesLesser = null;
-        switch (epsSel) {
-            case 0: formatFilter = "MOVIE"; break;
-            case 1: episodesLesser = 13; break;
-            case 2: episodesGreater = 11; episodesLesser = 27; break;
-            case 3: episodesGreater = 25; episodesLesser = 53; break;
-            case 4: episodesGreater = 49; episodesLesser = 150; break;
-            case 5: episodesGreater = 100; break;
-        }
-
-        // Experience → sort order + minimum score
-        let sortOrders, minScore;
-        switch (expSel) {
-            case 0: sortOrders = ["POPULARITY_DESC", "TRENDING_DESC", "SCORE_DESC"]; minScore = 65; break;
-            case 1: sortOrders = ["SCORE_DESC", "TRENDING_DESC", "POPULARITY_DESC"]; minScore = 68; break;
-            case 2: sortOrders = ["SCORE_DESC", "FAVOURITES_DESC", "TRENDING_DESC"]; minScore = 70; break;
-            case 3: sortOrders = ["FAVOURITES_DESC", "SCORE_DESC", "TRENDING_DESC", "UPDATED_AT_DESC"]; minScore = 72; break;
-            default: sortOrders = ["POPULARITY_DESC", "TRENDING_DESC"]; minScore = 65;
-        }
-
-        // Execute AniList queries
-        const allResults = [];
-        const seenIds = new Set();
-
-        for (const sort of sortOrders) {
-            const query = `
-                query ($genres: [String], $tags: [String], $sort: [MediaSort], $format: MediaFormat,
-                       $epsGreater: Int, $epsLesser: Int, $minScore: Int) {
-                    Page(perPage: 50) {
-                        media(type: ANIME, genre_in: $genres, tag_in: $tags, sort: [$sort],
-                              format: $format, episodes_greater: $epsGreater, episodes_lesser: $epsLesser,
-                              averageScore_greater: $minScore, isAdult: false) {
-                            id
-                            title { romaji english }
-                            coverImage { large extraLarge }
-                            format seasonYear averageScore episodes genres
-                            description(asHtml: false)
-                        }
-                    }
-                }
-            `;
-            const variables = {};
-            if (genres.length > 0) variables.genres = genres;
-            if (tags.length > 0) variables.tags = tags;
-            variables.sort = sort;
-            if (formatFilter) variables.format = formatFilter;
-            if (episodesGreater !== null) variables.epsGreater = episodesGreater;
-            if (episodesLesser !== null) variables.epsLesser = episodesLesser;
-            if (minScore) variables.minScore = minScore;
-
-            try {
-                const data = await anilistQuery(query, variables);
-                if (data.Page?.media) {
-                    for (const m of data.Page.media) {
-                        if (!seenIds.has(m.id)) {
-                            seenIds.add(m.id);
-                            const cleanDesc = m.description ? m.description.replace(/<[^>]*>/g, '').substring(0, 150) : '';
-                            allResults.push({
-                                title: m.title.english || m.title.romaji,
-                                synopsis: cleanDesc || "No description available.",
-                                episodes: m.episodes ? `${m.episodes} eps` : m.format || "?",
-                                rating: m.averageScore ? (m.averageScore / 10).toFixed(1) : "N/A",
-                                genres: m.genres || [],
-                                why: `Matches your ${genres[0] || 'selected'} taste • ⭐ ${m.averageScore ? m.averageScore + '%' : 'N/A'} on AniList`,
-                                coverImage: m.coverImage?.extraLarge || m.coverImage?.large || null,
-                                anilistId: m.id
-                            });
-                        }
-                    }
-                }
-            } catch (e) { console.warn("AniList query failed:", e.message); }
-        }
-
-        // Fallback: broader search if not enough results
-        if (allResults.length < 10 && genres.length > 0) {
-            try {
-                const fallbackQuery = `
-                    query ($genres: [String]) {
-                        Page(perPage: 50) {
-                            media(type: ANIME, genre_in: $genres, sort: [POPULARITY_DESC], isAdult: false) {
-                                id title { romaji english }
-                                coverImage { large extraLarge }
-                                format seasonYear averageScore episodes genres
-                                description(asHtml: false)
-                            }
-                        }
-                    }
-                `;
-                const data = await anilistQuery(fallbackQuery, { genres });
-                if (data.Page?.media) {
-                    for (const m of data.Page.media) {
-                        if (!seenIds.has(m.id)) {
-                            seenIds.add(m.id);
-                            const cleanDesc = m.description ? m.description.replace(/<[^>]*>/g, '').substring(0, 150) : '';
-                            allResults.push({
-                                title: m.title.english || m.title.romaji,
-                                synopsis: cleanDesc || "No description available.",
-                                episodes: m.episodes ? `${m.episodes} eps` : m.format || "?",
-                                rating: m.averageScore ? (m.averageScore / 10).toFixed(1) : "N/A",
-                                genres: m.genres || [],
-                                why: `Popular ${genres[0] || ''} anime • ⭐ ${m.averageScore ? m.averageScore + '%' : 'N/A'} on AniList`,
-                                coverImage: m.coverImage?.extraLarge || m.coverImage?.large || null,
-                                anilistId: m.id
-                            });
-                        }
-                    }
-                }
-            } catch (e) { console.warn("Fallback query failed:", e.message); }
-        }
-
-        if (allResults.length === 0) throw new Error("No anime found matching your preferences. Try different options!");
-
-        allRecommendations = allResults;
+        allRecommendations = await fetchQuizResults();
         completeRunnerAnimation();
         await new Promise(r => setTimeout(r, 600));
         currentPage = 1;
@@ -1173,8 +1192,138 @@ async function submitSimilar() {
 // ============================================
 
 // ============================================
-// PAGINATION
+// PAGINATION + SIDEBAR
 // ============================================
+
+// Sidebar step icons
+const SIDEBAR_ICONS = ['🎭', '🎬', '⏱️', '🎯', '🧠'];
+
+function generateSidebarHTML() {
+    let html = `<h3 class="sidebar-title">✨ Your Filters</h3>`;
+    QUIZ_STEPS.forEach((step, stepIdx) => {
+        const sel = selections[stepIdx];
+        html += `<div class="sidebar-section">
+            <div class="sidebar-section-title">${SIDEBAR_ICONS[stepIdx]} ${step.key.toUpperCase()}</div>
+            <div class="sidebar-pills">`;
+        step.choices.forEach((choice, choiceIdx) => {
+            const isActive = step.multi
+                ? (Array.isArray(sel) && sel.includes(choiceIdx))
+                : sel === choiceIdx;
+            html += `<button class="sidebar-pill ${isActive ? 'active' : ''}"
+                data-step="${stepIdx}" data-choice="${choiceIdx}" data-multi="${step.multi}"
+                onclick="toggleSidebarPill(this)">${choice.label}</button>`;
+        });
+        html += `</div></div>`;
+    });
+    html += `<div class="sidebar-actions">
+        <button class="btn-refresh-results" onclick="refreshFromSidebar()">🔄 Update Results</button>
+        <button class="btn-feeling-lucky" onclick="feelingLucky()">🎲 Feeling Lucky</button>
+    </div>`;
+    return html;
+}
+
+function toggleSidebarPill(el) {
+    const stepIdx = parseInt(el.dataset.step);
+    const choiceIdx = parseInt(el.dataset.choice);
+    const isMulti = el.dataset.multi === 'true';
+
+    if (isMulti) {
+        let sel = Array.isArray(selections[stepIdx]) ? [...selections[stepIdx]] : [];
+        if (sel.includes(choiceIdx)) {
+            sel = sel.filter(i => i !== choiceIdx);
+        } else {
+            sel.push(choiceIdx);
+        }
+        selections[stepIdx] = sel;
+    } else {
+        selections[stepIdx] = choiceIdx;
+    }
+
+    // Update all sidebars (desktop + bottom sheet)
+    updateAllSidebars();
+}
+
+function updateAllSidebars() {
+    const sidebarHTML = generateSidebarHTML();
+    const desktopSidebar = document.getElementById('results-sidebar');
+    const mobileSheet = document.getElementById('sidebar-bottom-sheet');
+    if (desktopSidebar) desktopSidebar.innerHTML = sidebarHTML;
+    if (mobileSheet) mobileSheet.innerHTML = `<div class="sheet-handle"></div>` + sidebarHTML;
+}
+
+async function refreshFromSidebar() {
+    // Close mobile sheet if open
+    closeMobileSheet();
+    // Dim the results grid to show loading
+    const grid = document.getElementById('results-grid');
+    const refreshBtn = document.querySelector('.btn-refresh-results');
+    if (grid) grid.style.opacity = '0.35';
+    if (refreshBtn) {
+        refreshBtn.textContent = '⏳ Updating...';
+        refreshBtn.disabled = true;
+    }
+
+    try {
+        const newResults = await fetchQuizResults();
+        allRecommendations = newResults;
+        currentPage = 1;
+        showResultsPage(1);
+        setRobotExpression("party");
+        setTimeout(() => setRobotExpression("idle"), 3000);
+    } catch (e) {
+        console.error("Refresh error:", e);
+        // Restore grid opacity if failed
+        if (grid) grid.style.opacity = '1';
+        if (refreshBtn) {
+            refreshBtn.textContent = '🔄 Update Results';
+            refreshBtn.disabled = false;
+        }
+        setRobotExpression("sad");
+        setTimeout(() => setRobotExpression("idle"), 2000);
+    }
+}
+
+function feelingLucky() {
+    // Randomize all selections
+    QUIZ_STEPS.forEach((step, i) => {
+        if (step.multi) {
+            // Pick 1-3 random choices
+            const count = Math.floor(Math.random() * 3) + 1;
+            const indices = [];
+            const available = [...Array(step.choices.length).keys()];
+            for (let j = 0; j < count && available.length > 0; j++) {
+                const pick = Math.floor(Math.random() * available.length);
+                indices.push(available.splice(pick, 1)[0]);
+            }
+            selections[i] = indices;
+        } else {
+            selections[i] = Math.floor(Math.random() * step.choices.length);
+        }
+    });
+    updateAllSidebars();
+    refreshFromSidebar();
+}
+
+// Mobile bottom sheet
+function openMobileSheet() {
+    const overlay = document.getElementById('sidebar-overlay');
+    const sheet = document.getElementById('sidebar-bottom-sheet');
+    if (overlay) overlay.classList.add('active');
+    if (sheet) {
+        sheet.innerHTML = `<div class="sheet-handle"></div>` + generateSidebarHTML();
+        sheet.classList.add('active');
+    }
+    document.body.style.overflow = 'hidden';
+}
+
+function closeMobileSheet() {
+    const overlay = document.getElementById('sidebar-overlay');
+    const sheet = document.getElementById('sidebar-bottom-sheet');
+    if (overlay) overlay.classList.remove('active');
+    if (sheet) sheet.classList.remove('active');
+    document.body.style.overflow = '';
+}
+
 function showResultsPage(page) {
     loadingContainer.classList.add("hidden");
     resultsContainer.classList.remove("hidden");
@@ -1184,29 +1333,62 @@ function showResultsPage(page) {
     const pageItems = allRecommendations.slice(start, start + PER_PAGE);
 
     const titleText = currentMode === "similar" ? `Similar to "${selectedAnime?.title}"` : "Your Anime Matches";
-    document.querySelector(".results-title").textContent = titleText;
-    resultsCount.textContent = `${allRecommendations.length} anime found — Page ${currentPage} of ${totalPages}`;
 
-    renderResults(pageItems, start);
-    renderPagination(totalPages);
+    // Build the two-column layout only for quiz mode
+    if (currentMode === "quiz") {
+        resultsContainer.innerHTML = `
+            <h2 class="results-title">${titleText}</h2>
+            <p class="results-subtitle" id="results-count"></p>
+            <div class="results-layout">
+                <aside class="results-sidebar" id="results-sidebar"></aside>
+                <div class="results-main">
+                    <div class="results-grid" id="results-grid"></div>
+                    <div class="pagination" id="pagination"></div>
+                </div>
+            </div>
+            <button class="sidebar-fab" id="sidebar-fab" onclick="openMobileSheet()">⚙️</button>
+            <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeMobileSheet()"></div>
+            <div class="sidebar-bottom-sheet" id="sidebar-bottom-sheet"></div>
+        `;
+        // Render sidebar
+        document.getElementById('results-sidebar').innerHTML = generateSidebarHTML();
+    } else {
+        resultsContainer.innerHTML = `
+            <h2 class="results-title">${titleText}</h2>
+            <p class="results-subtitle" id="results-count"></p>
+            <div class="results-grid" id="results-grid"></div>
+            <div class="pagination" id="pagination"></div>
+        `;
+    }
+
+    // Update refs after innerHTML change
+    const newGrid = document.getElementById('results-grid');
+    const newPagination = document.getElementById('pagination');
+    const newCount = document.getElementById('results-count');
+    if (newCount) newCount.textContent = `${allRecommendations.length} anime found — Page ${currentPage} of ${totalPages}`;
+
+    renderResults(pageItems, start, newGrid);
+    renderPagination(totalPages, newPagination);
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-function renderPagination(totalPages) {
-    if (totalPages <= 1) { paginationEl.innerHTML = ""; return; }
+function renderPagination(totalPages, container) {
+    const el = container || paginationEl;
+    if (totalPages <= 1) { el.innerHTML = ""; return; }
     let html = `<button class="page-btn nav-btn" ${currentPage === 1 ? "disabled" : ""} onclick="showResultsPage(${currentPage - 1})">← Prev</button>`;
     for (let p = 1; p <= totalPages; p++) {
         html += `<button class="page-btn ${p === currentPage ? 'active' : ''}" onclick="showResultsPage(${p})">${p}</button>`;
     }
     html += `<button class="page-btn nav-btn" ${currentPage === totalPages ? "disabled" : ""} onclick="showResultsPage(${currentPage + 1})">Next →</button>`;
-    paginationEl.innerHTML = html;
+    el.innerHTML = html;
 }
 
 // ============================================
 // RESULTS RENDERING
 // ============================================
-function renderResults(animeList, startIndex) {
-    resultsGrid.innerHTML = animeList.map((anime, i) => {
+function renderResults(animeList, startIndex, gridEl) {
+    const grid = gridEl || resultsGrid;
+    grid.innerHTML = animeList.map((anime, i) => {
         const rank = String(startIndex + i + 1).padStart(2, "0");
         const genrePills = (anime.genres || []).map(g => `<span class="genre-pill">${escapeHTML(g)}</span>`).join("");
         let diffClass = "difficulty-casual", diffLabel = anime.difficulty || "Casual";
