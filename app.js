@@ -917,15 +917,15 @@ async function fetchQuizResults() {
     themeArr.forEach(i => tags.push(...(THEME_TO_TAGS[i] || [])));
 
     // Build episode/format filter
-    let formatFilter = null, episodesGreater = null, episodesLesser = null;
+    let formatInFilter = null, episodesGreater = null, episodesLesser = null;
     const epsVal = Array.isArray(epsSel) ? epsSel[0] : epsSel;
     switch (epsVal) {
-        case 0: formatFilter = "MOVIE"; break;
-        case 1: episodesLesser = 13; break;
-        case 2: episodesGreater = 11; episodesLesser = 27; break;
-        case 3: episodesGreater = 25; episodesLesser = 53; break;
-        case 4: episodesGreater = 49; episodesLesser = 150; break;
-        case 5: episodesGreater = 100; break;
+        case 0: formatInFilter = ["MOVIE", "OVA", "SPECIAL"]; break;
+        case 1: formatInFilter = ["TV", "TV_SHORT", "ONA"]; episodesLesser = 13; break;
+        case 2: formatInFilter = ["TV", "TV_SHORT", "ONA"]; episodesGreater = 11; episodesLesser = 27; break;
+        case 3: formatInFilter = ["TV", "TV_SHORT", "ONA"]; episodesGreater = 25; episodesLesser = 53; break;
+        case 4: formatInFilter = ["TV", "TV_SHORT", "ONA"]; episodesGreater = 49; episodesLesser = 150; break;
+        case 5: formatInFilter = ["TV", "TV_SHORT", "ONA"]; episodesGreater = 100; break;
     }
 
     // Experience → sort order + minimum score
@@ -944,8 +944,13 @@ async function fetchQuizResults() {
     const seenIds = new Set();
 
     for (const sort of sortOrders) {
-        let queryArgs = `$sort: [MediaSort], $format: MediaFormat, $minScore: Int`;
-        let mediaArgs = `type: ANIME, sort: [$sort], format: $format, averageScore_greater: $minScore, isAdult: false`;
+        let queryArgs = `$sort: [MediaSort], $minScore: Int`;
+        let mediaArgs = `type: ANIME, sort: [$sort], averageScore_greater: $minScore, isAdult: false`;
+
+        if (formatInFilter !== null) {
+            queryArgs += `, $formatIn: [MediaFormat]`;
+            mediaArgs += `, format_in: $formatIn`;
+        }
 
         if (episodesGreater !== null) {
             queryArgs += `, $epsGreater: Int`;
@@ -983,7 +988,7 @@ async function fetchQuizResults() {
         if (genres.length > 0) variables.genres = genres;
         if (tags.length > 0) variables.tags = tags;
         variables.sort = sort;
-        if (formatFilter) variables.format = formatFilter;
+        if (formatInFilter) variables.formatIn = formatInFilter;
         if (episodesGreater !== null) variables.epsGreater = episodesGreater;
         if (episodesLesser !== null) variables.epsLesser = episodesLesser;
         if (minScore) variables.minScore = minScore;
@@ -1352,11 +1357,13 @@ function openMobileSheet() {
 function closeMobileSheet(fromPopState = false) {
     const overlay = document.getElementById('sidebar-overlay');
     const sheet = document.getElementById('sidebar-bottom-sheet');
+    const wasActive = sheet && sheet.classList.contains('active');
+
     if (overlay) overlay.classList.remove('active');
     if (sheet) sheet.classList.remove('active');
     document.body.style.overflow = '';
 
-    if (fromPopState !== true) {
+    if (wasActive && fromPopState !== true) {
         history.back();
     }
 }
