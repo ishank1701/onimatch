@@ -1054,6 +1054,13 @@ async function fetchQuizResults() {
     }
 
     if (allResults.length === 0) throw new Error("No anime found matching your preferences. Try different options!");
+
+    // Shuffle the results to provide a unique recommendation feed every time
+    for (let i = allResults.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [allResults[i], allResults[j]] = [allResults[j], allResults[i]];
+    }
+
     return allResults;
 }
 
