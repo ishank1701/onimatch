@@ -1019,10 +1019,26 @@ async function fetchQuizResults() {
     // Fallback: broader search if not enough results
     if (allResults.length < 10 && genres.length > 0) {
         try {
+            let fbQueryArgs = `$genres: [String]`;
+            let fbMediaArgs = `type: ANIME, genre_in: $genres, sort: [POPULARITY_DESC], isAdult: false`;
+
+            if (formatInFilter !== null) {
+                fbQueryArgs += `, $formatIn: [MediaFormat]`;
+                fbMediaArgs += `, format_in: $formatIn`;
+            }
+            if (episodesGreater !== null) {
+                fbQueryArgs += `, $epsGreater: Int`;
+                fbMediaArgs += `, episodes_greater: $epsGreater`;
+            }
+            if (episodesLesser !== null) {
+                fbQueryArgs += `, $epsLesser: Int`;
+                fbMediaArgs += `, episodes_lesser: $epsLesser`;
+            }
+
             const fallbackQuery = `
-                query ($genres: [String]) {
+                query (${fbQueryArgs}) {
                     Page(perPage: 50) {
-                        media(type: ANIME, genre_in: $genres, sort: [POPULARITY_DESC], isAdult: false) {
+                        media(${fbMediaArgs}) {
                             id title { romaji english }
                             coverImage { large extraLarge }
                             format seasonYear averageScore episodes genres
@@ -1031,7 +1047,12 @@ async function fetchQuizResults() {
                     }
                 }
             `;
-            const data = await anilistQuery(fallbackQuery, { genres });
+            const fbVariables = { genres };
+            if (formatInFilter) fbVariables.formatIn = formatInFilter;
+            if (episodesGreater !== null) fbVariables.epsGreater = episodesGreater;
+            if (episodesLesser !== null) fbVariables.epsLesser = episodesLesser;
+
+            const data = await anilistQuery(fallbackQuery, fbVariables);
             if (data.Page?.media) {
                 for (const m of data.Page.media) {
                     if (!seenIds.has(m.id)) {
