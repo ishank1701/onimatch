@@ -318,6 +318,10 @@ let selectedAnime = null;     // For similar search
 let searchDebounce = null;
 let currentMode = "quiz";     // Track which mode generated results
 
+if (!history.state) {
+    history.replaceState({ layer: 'home' }, "");
+}
+
 // ============================================
 // DOM REFS
 // ============================================
@@ -363,7 +367,10 @@ const speechText = document.getElementById("speech-text");
 // ============================================
 const homeSection = document.getElementById("home-section");
 
-function goHome() {
+function goHome(fromPopState = false) {
+    if (document.querySelector('.studio-page')) {
+        exitStudioPage(true);
+    }
     // Show home section
     homeSection.style.display = '';
     document.getElementById('features-section').style.display = '';
@@ -384,9 +391,13 @@ function goHome() {
     setRobotExpression('idle');
     speechText.textContent = "Hey! Ready to find your next anime? 🏴\u200d☠️";
     window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    if (fromPopState !== true) {
+        history.pushState({ layer: 'home' }, "");
+    }
 }
 
-function switchTab(tab) {
+function switchTab(tab, fromPopState = false) {
     activeTab = tab;
     // Hide home, show tab bar
     homeSection.style.display = 'none';
@@ -411,6 +422,10 @@ function switchTab(tab) {
     } else {
         setRobotExpression("happy");
         speechText.textContent = "Type an anime you love! 🔍";
+    }
+
+    if (fromPopState !== true) {
+        history.pushState({ layer: 'tab', tab: tab }, "");
     }
 }
 
@@ -518,7 +533,11 @@ async function loadHomeSection() {
     `).join('');
 }
 
-async function loadStudioAnime(studioId, studioName) {
+async function loadStudioAnime(studioId, studioName, fromPopState = false) {
+    if (fromPopState !== true) {
+        history.pushState({ layer: 'studio', id: studioId, name: studioName }, "");
+    }
+
     // Hide other homepage sections, show studio full page
     const homeSection = document.getElementById('home-section');
     homeSection.innerHTML = `
@@ -602,7 +621,7 @@ setTimeout(() => {
     originalHomeHTML = document.getElementById('home-section')?.innerHTML || '';
 }, 100);
 
-function exitStudioPage() {
+function exitStudioPage(fromPopState = false) {
     const homeSection = document.getElementById('home-section');
     // Rebuild original home HTML structure
     homeSection.innerHTML = `
@@ -640,6 +659,10 @@ function exitStudioPage() {
     // Reload data
     loadHomeSection();
     window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    if (fromPopState !== true) {
+        history.back();
+    }
 }
 
 function resetStudioGrid() {
@@ -1306,6 +1329,7 @@ function feelingLucky() {
 
 // Mobile bottom sheet
 function openMobileSheet() {
+    history.pushState({ layer: 'sheet' }, "");
     const overlay = document.getElementById('sidebar-overlay');
     const sheet = document.getElementById('sidebar-bottom-sheet');
     if (overlay) overlay.classList.add('active');
@@ -1316,12 +1340,16 @@ function openMobileSheet() {
     document.body.style.overflow = 'hidden';
 }
 
-function closeMobileSheet() {
+function closeMobileSheet(fromPopState = false) {
     const overlay = document.getElementById('sidebar-overlay');
     const sheet = document.getElementById('sidebar-bottom-sheet');
     if (overlay) overlay.classList.remove('active');
     if (sheet) sheet.classList.remove('active');
     document.body.style.overflow = '';
+
+    if (fromPopState !== true) {
+        history.back();
+    }
 }
 
 function showResultsPage(page) {
@@ -1411,7 +1439,11 @@ function renderResults(animeList, startIndex, gridEl) {
 // ============================================
 // ANIME DETAIL MODAL
 // ============================================
-async function openAnimeDetail(index, directTitle, directAnilistId) {
+async function openAnimeDetail(index, directTitle, directAnilistId, fromPopState = false) {
+    if (fromPopState !== true) {
+        history.pushState({ layer: 'modal' }, "");
+    }
+
     let anime;
     let fetchById = false;
 
@@ -1553,11 +1585,15 @@ async function openAnimeDetail(index, directTitle, directAnilistId) {
     }
 }
 
-function closeAnimeDetail() {
+function closeAnimeDetail(fromPopState = false) {
     const modal = document.getElementById('anime-detail-modal');
     if (modal) {
         modal.classList.remove('active');
         document.body.style.overflow = '';
+    }
+
+    if (fromPopState !== true) {
+        history.back();
     }
 }
 
@@ -1615,6 +1651,59 @@ function resetAll() {
     renderStep(0);
     setRobotExpression("idle");
 }
+
+// ============================================
+// HISTORY & NAVIGATION HANDLING
+// ============================================
+window.addEventListener('popstate', (e) => {
+    // 1. Close mobile sheet if open
+    const mobileSheet = document.getElementById('sidebar-bottom-sheet');
+    if (mobileSheet && mobileSheet.classList.contains('active')) {
+        closeMobileSheet(true);
+        return;
+    }
+
+    // 2. Close modal if open
+    const modal = document.getElementById('anime-detail-modal');
+    if (modal && modal.classList.contains('active')) {
+        closeAnimeDetail(true);
+        return;
+    }
+
+    // 3. Handle base state
+    const state = e.state;
+    if (state) {
+        if (state.layer === 'home') {
+            goHome(true);
+        } else if (state.layer === 'tab') {
+            switchTab(state.tab, true);
+        } else if (state.layer === 'studio') {
+            // If going forward/back to a studio page
+            if (!document.querySelector('.studio-page')) {
+                loadStudioAnime(state.id, state.name, true);
+            }
+        }
+    } else {
+        // Fallback
+        goHome(true);
+    }
+});
+
+document.getElementById("tab-bar").style.display = "flex";
+
+resultsGrid.innerHTML = "";
+paginationEl.innerHTML = "";
+
+if (runner) runner.style.left = "0%";
+if (loadingProgressFill) loadingProgressFill.style.width = "0%";
+
+// Reset similar search
+clearSelectedAnime();
+searchInput.value = "";
+
+switchTab(currentMode);
+renderStep(0);
+setRobotExpression("idle");
 
 // ============================================
 // UTILITY
