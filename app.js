@@ -944,8 +944,17 @@ async function fetchQuizResults() {
     const seenIds = new Set();
 
     for (const sort of sortOrders) {
-        let queryArgs = `$sort: [MediaSort], $format: MediaFormat, $epsGreater: Int, $epsLesser: Int, $minScore: Int`;
-        let mediaArgs = `type: ANIME, sort: [$sort], format: $format, episodes_greater: $epsGreater, episodes_lesser: $epsLesser, averageScore_greater: $minScore, isAdult: false`;
+        let queryArgs = `$sort: [MediaSort], $format: MediaFormat, $minScore: Int`;
+        let mediaArgs = `type: ANIME, sort: [$sort], format: $format, averageScore_greater: $minScore, isAdult: false`;
+
+        if (episodesGreater !== null) {
+            queryArgs += `, $epsGreater: Int`;
+            mediaArgs += `, episodes_greater: $epsGreater`;
+        }
+        if (episodesLesser !== null) {
+            queryArgs += `, $epsLesser: Int`;
+            mediaArgs += `, episodes_lesser: $epsLesser`;
+        }
 
         if (genres.length > 0) {
             queryArgs += `, $genres: [String]`;
