@@ -1689,21 +1689,7 @@ window.addEventListener('popstate', (e) => {
     }
 });
 
-document.getElementById("tab-bar").style.display = "flex";
 
-resultsGrid.innerHTML = "";
-paginationEl.innerHTML = "";
-
-if (runner) runner.style.left = "0%";
-if (loadingProgressFill) loadingProgressFill.style.width = "0%";
-
-// Reset similar search
-clearSelectedAnime();
-searchInput.value = "";
-
-switchTab(currentMode);
-renderStep(0);
-setRobotExpression("idle");
 
 // ============================================
 // UTILITY
