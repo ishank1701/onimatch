@@ -1,16 +1,5 @@
 <!DOCTYPE html>
-
-    <style>
-        /* High-Priority Morph Overrides */
-        .app-header.scrolled {
-              height: 60px !important;
-              background: rgba(15, 23, 42, 0.85) !important;
-              backdrop-filter: blur(12px) !important;
-              border-bottom: 2px solid var(--neon-cyan) !important;
-        }
-        .app-header.scrolled .logo-img { transform: scale(0.8) !important; }
-        .app-header.scrolled .site-tagline { display: none !important; }
-    </style><html lang="en">
+<html lang="en">
 
 <head>
     <meta charset="UTF-8">
@@ -24,6 +13,23 @@
         href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="style.css">
+    <style>
+        /* Nuclear Priority Styles for Sticky Morph */
+        .app-header.scrolled {
+            padding: 8px 0 8px !important;
+            background: rgba(15, 23, 42, 0.7) !important;
+            backdrop-filter: blur(20px) saturate(180%) !important;
+            border-bottom: 1px solid rgba(56, 189, 248, 0.3) !important;
+        }
+        .app-header.scrolled .hero-logo {
+            max-width: 150px !important;
+        }
+        .app-header.scrolled .site-tagline {
+            display: none !important;
+            opacity: 0 !important;
+            visibility: hidden !important;
+        }
+    </style>
 </head>
 
 <body>
@@ -57,35 +63,36 @@
             </div>
             <p class="site-tagline">Get personalized anime recommendations based on your mood, genre & taste</p>
 
-            <!-- Features Section -->
-            <div class="features-section" id="features-section">
-                <div class="feature-card">
-                    <span class="feature-icon">🎯</span>
-                    <h3>Smart Quiz</h3>
-                    <p>Answer 5 questions about your mood, genre & taste — get 25+ perfect matches instantly</p>
-                </div>
-                <div class="feature-card">
-                    <span class="feature-icon">🔍</span>
-                    <h3>Find Similar</h3>
-                    <p>Love an anime? Search it and discover 50+ similar titles recommended by the AniList community</p>
-                </div>
-                <div class="feature-card">
-                    <span class="feature-icon">🎬</span>
-                    <h3>Trailers & Details</h3>
-                    <p>Click any recommendation to watch trailers, read descriptions, and see full details</p>
-                </div>
-                <div class="feature-card">
-                    <span class="feature-icon">⚡</span>
-                    <h3>Multi-API Powered</h3>
-                    <p>Powered by AniList, Jikan &amp; Kitsu APIs for the most accurate and comprehensive anime data</p>
-                </div>
-            </div>
         </header>
+
+        <!-- Features Section (Outside of sticky header) -->
+        <div class="features-section" id="features-section">
+            <div class="feature-card">
+                <span class="feature-icon">🎯</span>
+                <h3>Smart Quiz</h3>
+                <p>Answer 5 questions about your mood, genre & taste — get 25+ perfect matches instantly</p>
+            </div>
+            <div class="feature-card">
+                <span class="feature-icon">🔍</span>
+                <h3>Find Similar</h3>
+                <p>Love an anime? Search it and discover 50+ similar titles recommended by the AniList community</p>
+            </div>
+            <div class="feature-card">
+                <span class="feature-icon">🎬</span>
+                <h3>Trailers & Details</h3>
+                <p>Click any recommendation to watch trailers, read descriptions, and see full details</p>
+            </div>
+            <div class="feature-card">
+                <span class="feature-icon">⚡</span>
+                <h3>Multi-API Powered</h3>
+                <p>Powered by AniList, Jikan &amp; Kitsu APIs for the most accurate and comprehensive anime data</p>
+            </div>
+        </div>
 
         <!-- =============================== -->
         <!-- HOME SECTION — Anime Discovery  -->
         <!-- =============================== -->
-        <div class="home-section" id="home-section">
+        <section class="home-section" id="home-section">
             <!-- Hero CTA -->
             <div class="home-cta">
                 <h2 class="home-cta-title">Find Your Perfect Anime ✨</h2>
@@ -97,25 +104,25 @@
             </div>
 
             <!-- Top Anime -->
-            <div class="home-row">
+            <div class="home-row reveal-on-scroll">
                 <h3 class="home-row-title">🏆 Top Anime of All Time</h3>
                 <div class="home-scroll" id="home-top-anime"></div>
             </div>
 
             <!-- Currently Airing -->
-            <div class="home-row">
+            <div class="home-row reveal-on-scroll">
                 <h3 class="home-row-title">📺 Currently Airing</h3>
                 <div class="home-scroll" id="home-airing"></div>
             </div>
 
             <!-- Top Upcoming -->
-            <div class="home-row">
+            <div class="home-row reveal-on-scroll">
                 <h3 class="home-row-title">🔮 Top Upcoming</h3>
                 <div class="home-scroll" id="home-upcoming"></div>
             </div>
 
             <!-- Studio Collections -->
-            <div class="home-row">
+            <div class="home-row reveal-on-scroll">
                 <h3 class="home-row-title">🎨 Studio Collections</h3>
                 <div class="studio-grid" id="studio-grid"></div>
             </div>
@@ -282,6 +289,20 @@
     </div>
 
     <script src="app.js"></script>
+    <script>
+        // Inline Scroll Morph Guard
+        window.addEventListener('scroll', () => {
+            const header = document.querySelector('.app-header');
+            if (header) {
+                if (window.scrollY > 50) {
+                    header.classList.add('scrolled');
+                } else {
+                    header.classList.remove('scrolled');
+                }
+            }
+        });
+    </script>
+</body>
 
     <!-- Footer -->
     <footer class="site-footer">
@@ -314,4 +335,3 @@
 </body>
 
 </html>
-

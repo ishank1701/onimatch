@@ -1,6 +1,5 @@
-
 /* ============================================
-   ONIMATCH â€” Night Sea + Stars Theme
+   ONIMATCH — Night Sea + Stars Theme
    ============================================ */
 
 :root {
@@ -233,7 +232,7 @@ body {
 }
 
 /* ============================================
-   HERO â€” LOGO + TAGLINE
+   HERO — LOGO + TAGLINE
    ============================================ */
 .app-container {
     position: relative;
@@ -299,7 +298,7 @@ body {
     line-height: 1.3;
 }
 
-/* Header Row â€” Home + Logo */
+/* Header Row — Home + Logo */
 .header-row {
     display: flex;
     align-items: center;
@@ -497,7 +496,7 @@ body {
 }
 
 /* ============================================
-   HOME SECTION â€” Anime Discovery
+   HOME SECTION — Anime Discovery
    ============================================ */
 .home-section {
     margin-top: 16px;
@@ -1248,7 +1247,7 @@ body {
     height: 45px;
 }
 
-/* The brim â€” wide flat oval at the bottom */
+/* The brim — wide flat oval at the bottom */
 .hat-brim {
     position: absolute;
     bottom: 0;
@@ -1263,7 +1262,7 @@ body {
     z-index: 1;
 }
 
-/* The dome â€” rounded top */
+/* The dome — rounded top */
 .hat-dome {
     position: absolute;
     bottom: 8px;
@@ -1903,7 +1902,7 @@ body {
 }
 
 /* ============================================
-   LOADING â€” SHIP ON OCEAN WAVES
+   LOADING — SHIP ON OCEAN WAVES
    ============================================ */
 .loading-container {
     text-align: center;
@@ -2734,7 +2733,7 @@ body {
 }
 
 /* ============================================
-   RESULT CARD â€” Clickable
+   RESULT CARD — Clickable
    ============================================ */
 .result-card {
     cursor: pointer;
@@ -2989,7 +2988,7 @@ body {
 }
 
 /* ============================================
-   RESULTS SIDEBAR â€” Filter Panel
+   RESULTS SIDEBAR — Filter Panel
    ============================================ */
 .results-layout {
     display: grid;
@@ -3260,6 +3259,3 @@ body {
     visibility: hidden !important;
     height: 0 !important;
 }
-Pressing key...Getting DOM...Stopping...
-
-Stop Agen

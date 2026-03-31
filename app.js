@@ -424,10 +424,26 @@ function switchTab(tab, fromPopState = false) {
         speechText.textContent = "Type an anime you love! 🔍";
     }
 
+    updateTabIndicator(tab);
+
     if (fromPopState !== true) {
         history.pushState({ layer: 'tab', tab: tab }, "");
     }
 }
+
+function updateTabIndicator(tab) {
+    const indicator = document.getElementById('tab-indicator');
+    const activeBtn = tab === "quiz" ? tabQuiz : tabSimilar;
+    if (indicator && activeBtn) {
+        indicator.style.width = `${activeBtn.offsetWidth}px`;
+        indicator.style.left = `${activeBtn.offsetLeft}px`;
+    }
+}
+
+// Ensure indicator is correct on resize
+window.addEventListener('resize', () => {
+    if (activeTab) updateTabIndicator(activeTab);
+});
 
 tabQuiz.addEventListener("click", () => switchTab("quiz"));
 tabSimilar.addEventListener("click", () => switchTab("similar"));
@@ -607,7 +623,6 @@ async function loadStudioAnime(studioId, studioName, fromPopState = false) {
                 </div>
             </div>`;
         }).join('');
-
     } catch (e) {
         const grid = document.getElementById('studio-anime-grid');
         if (grid) grid.innerHTML = `<p style="color:var(--text-muted)">Failed to load. <button onclick="exitStudioPage()">Back</button></p>`;
@@ -1831,20 +1846,19 @@ btnRetry.addEventListener("click", () => {
 })();
 
 // ============================================
-// INIT
-// ============================================
-renderStep(0);
-setRobotExpression("idle");
-
-
-// ============================================
 // STICKY HEADER MORPH
 // ============================================
 const appHeader = document.querySelector('.app-header');
 window.addEventListener('scroll', () => {
-       if (window.scrollY > 50) {
-                  appHeader.classList.add('scrolled');
-       } else {
-                  appHeader.classList.remove('scrolled');
-       }
+    if (window.scrollY > 50) {
+        appHeader.classList.add('scrolled');
+    } else {
+        appHeader.classList.remove('scrolled');
+    }
 });
+
+// ============================================
+// INIT
+// ============================================
+renderStep(0);
+setRobotExpression("idle");
