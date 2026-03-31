@@ -1835,3 +1835,16 @@ btnRetry.addEventListener("click", () => {
 // ============================================
 renderStep(0);
 setRobotExpression("idle");
+
+
+// ============================================
+// STICKY HEADER MORPH
+// ============================================
+const appHeader = document.querySelector('.app-header');
+window.addEventListener('scroll', () => {
+       if (window.scrollY > 50) {
+                  appHeader.classList.add('scrolled');
+       } else {
+                  appHeader.classList.remove('scrolled');
+       }
+});
