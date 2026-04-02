@@ -237,7 +237,7 @@ const QUIZ_STEPS = [
             { label: "Want to Laugh", desc: "Just here for comedy and good vibes", examples: "Gintama, KonoSuba, Grand Blue" },
             { label: "Feeling Adventurous", desc: "Ready to explore new worlds", examples: "One Piece, Made in Abyss, Frieren" },
             { label: "Spicy & Frisky 🔥", desc: "In the mood for something steamy & bold", examples: "High School DxD, Prison School, Food Wars" },
-            { label: "Dark & Vengeful 🗡️", desc: "Craving revenge arcs and anti-heroes", examples: "Vinland Saga, Berserk, Redo of Healer" }
+            { label: "Dark & Vengeful �-�️", desc: "Craving revenge arcs and anti-heroes", examples: "Vinland Saga, Berserk, Redo of Healer" }
         ]
     },
     {
@@ -389,7 +389,7 @@ function goHome(fromPopState = false) {
     renderStep(0);
     clearSelectedAnime();
     setRobotExpression('idle');
-    speechText.textContent = "Hey! Ready to find your next anime? 🏴\u200d☠️";
+    speechText.textContent = "Hey! Ready to find your next anime?";
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
     if (fromPopState !== true) {
@@ -715,7 +715,7 @@ document.addEventListener("mousemove", (e) => {
 });
 
 const ROBOT_EXPRESSIONS = {
-    idle: { cls: '', msg: "Hey nakama! Pick your vibe! 🏴‍☠️" },
+    idle: { cls: '', msg: "Hey nakama! Pick your vibe!" },
     excited: { cls: 'excited', msg: "Great picks! 🔥" },
     happy: { cls: 'happy', msg: "Nice choice! 😄" },
     thinking: { cls: 'thinking', msg: "Hmm, processing... 🤔" },
@@ -1850,12 +1850,13 @@ btnRetry.addEventListener("click", () => {
 // ============================================
 const appHeader = document.querySelector('.app-header');
 window.addEventListener('scroll', () => {
-    if (window.scrollY > 50) {
+    // Using simple threshold for morphing
+    if (window.pageYOffset > 20) {
         appHeader.classList.add('scrolled');
     } else {
         appHeader.classList.remove('scrolled');
     }
-});
+}, { passive: true });
 
 // ============================================
 // INIT

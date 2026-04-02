@@ -1,53 +1,324 @@
 <!DOCTYPE html>
-<html>
-    <head>
-        <meta charset="utf-8">
-        <title>ONIMATCH</title>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ONIMATCH - Find Your Perfect Anime</title>
+    <meta name="description"
+        content="Take a fun quiz or search by anime name to get personalized anime recommendations.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="style.css">
-    </head>
+</head>
+
 <body>
+
+    <!-- Animated Background -->
+    <div class="bg-particles" aria-hidden="true">
+        <div class="particle p1"></div>
+        <div class="particle p2"></div>
+        <div class="particle p3"></div>
+        <div class="particle p4"></div>
+        <div class="particle p5"></div>
+        <div class="particle p6"></div>
+    </div>
+    <div class="scan-lines" aria-hidden="true"></div>
+
+    <!-- Main App -->
     <div class="app-container">
+        <!-- Header Spacer to prevent layout jump with fixed header -->
+        <div class="header-spacer"></div>
+
+        <!-- Header -->
         <header class="app-header">
             <div class="header-row">
-                <button class="home-btn" id="btn-home">Home</button>button>
-                <div class="hero-logo"><img src="logo.png" alt="ONIMATCH" class="hero-img"></div>div>
-            </div>div>
-        </header>header>
+                <button class="home-btn" id="btn-home" title="Home">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                        <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                    </svg>
+                </button>
+                <div class="hero-logo">
+                    <img src="logo.png" alt="ONIMATCH" class="hero-img">
+                </div>
+                <div class="header-dummy" aria-hidden="true"></div>
+            </div>
+            <p class="site-tagline">Get personalized anime recommendations based on your mood, genre & taste</p>
+
+        </header>
+
+        <!-- Features Section (Outside of sticky header) -->
+        <div class="features-section" id="features-section">
+            <div class="feature-card">
+                <span class="feature-icon">#</span>
+                <h3>Smart Quiz</h3>
+                <p>Answer 5 questions about your mood, genre & taste — get 25+ perfect matches instantly</p>
+            </div>
+            <div class="feature-card">
+                <span class="feature-icon">?</span>
+                <h3>Find Similar</h3>
+                <p>Love an anime? Search it and discover 50+ similar titles recommended by the AniList community</p>
+            </div>
+            <div class="feature-card">
+                <span class="feature-icon">!</span>
+                <h3>Trailers & Details</h3>
+                <p>Click any recommendation to watch trailers, read descriptions, and see full details</p>
+            </div>
+            <div class="feature-card">
+                <span class="feature-icon">+</span>
+                <h3>Multi-API Powered</h3>
+                <p>Powered by AniList, Jikan &amp; Kitsu APIs for the most accurate and comprehensive anime data</p>
+            </div>
+        </div>
+
+        <!-- =============================== -->
+        <!-- HOME SECTION - Anime Discovery  -->
+        <!-- =============================== -->
         <section class="home-section" id="home-section">
+            <!-- Hero CTA -->
             <div class="home-cta">
-                <h2 class="home-cta-title" style="color:white">Find Your Perfect Anime</h2>h2>
+                <h2 class="home-cta-title">Find Your Perfect Anime</h2>
+                <p class="home-cta-desc">Take our quiz or search for an anime you love</p>
                 <div class="home-cta-buttons">
-                    <button class="btn-cta-quiz" id="btn-cta-quiz">Take the Quiz</button>button>
-                    <button class="btn-cta-similar" id="btn-cta-similar">Find Similar</button>button>
-                </div>div>
-            </div>div>
-            <div class="home-row"><div class="home-scroll" id="home-top-anime"></div>div></div>div>
-            <div class="home-row"><div class="home-scroll" id="home-airing"></div>div></div>div>
-            <div class="home-row"><div class="home-scroll" id="home-upcoming"></div>div></div>div>
-            <div class="studio-grid" id="studio-grid"></div>div>
-        </section>section>
+                    <button class="btn-cta-quiz" id="btn-cta-quiz">Take the Quiz</button>
+                    <button class="btn-cta-similar" id="btn-cta-similar">Find Similar</button>
+                </div>
+            </div>
+
+            <!-- Top Anime -->
+            <div class="home-row reveal-on-scroll">
+                <h3 class="home-row-title">Top Anime of All Time</h3>
+                <div class="home-scroll" id="home-top-anime"></div>
+            </div>
+
+            <!-- Currently Airing -->
+            <div class="home-row reveal-on-scroll">
+                <h3 class="home-row-title">Currently Airing</h3>
+                <div class="home-scroll" id="home-airing"></div>
+            </div>
+
+            <!-- Top Upcoming -->
+            <div class="home-row reveal-on-scroll">
+                <h3 class="home-row-title">Top Upcoming</h3>
+                <div class="home-scroll" id="home-upcoming"></div>
+            </div>
+
+            <!-- Studio Collections -->
+            <div class="home-row reveal-on-scroll">
+                <h3 class="home-row-title">Studio Collections</h3>
+                <div class="studio-grid" id="studio-grid"></div>
+            </div>
+        </div>
+
+        <!-- Tab Bar (hidden on home, shown when quiz/similar active) -->
         <div class="tab-bar hidden" id="tab-bar">
-            <button class="tab-btn active" data-tab="quiz" id="tab-quiz">Quiz</button>button>
-            <button class="tab-btn" data-tab="similar" id="tab-similar">Similar</button>button>
-        </div>div>
+            <button class="tab-btn active" data-tab="quiz" id="tab-quiz">
+                <span class="tab-icon">#</span> Quiz Match
+            </button>
+            <button class="tab-btn" data-tab="similar" id="tab-similar">
+                <span class="tab-icon">?</span> Find Similar
+            </button>
+            <div class="tab-indicator" id="tab-indicator"></div>
+        </div>
+
+        <!-- ======================== -->
+        <!-- SECTION 1: QUIZ MATCH   -->
+        <!-- ======================== -->
         <div class="section-panel" id="section-quiz">
-            <div class="progress-fill" id="progress-fill"></div>div>
-            <div id="quiz-container"><div id="quiz-step"></div>div><button id="btn-back" class="hidden">Back</button>button><button id="btn-next" disabled>Next</button>button></div>div>
-        </div>div>
+            <!-- Progress Bar -->
+            <div class="progress-wrapper" id="progress-wrapper">
+                <div class="progress-info">
+                    <span class="progress-label" id="progress-label">Step 1 of 5</span>
+                    <span class="progress-pct" id="progress-pct">20%</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progress-fill"></div>
+                </div>
+            </div>
+
+            <!-- Quiz Container -->
+            <div class="quiz-container" id="quiz-container">
+                <div class="quiz-step" id="quiz-step"></div>
+                <div class="quiz-nav" id="quiz-nav">
+                    <button class="btn-back hidden" id="btn-back">← Back</button>
+                    <button class="btn-next" id="btn-next" disabled>Next →</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================== -->
+        <!-- SECTION 2: FIND SIMILAR    -->
+        <!-- ========================== -->
         <div class="section-panel" id="section-similar">
-            <input type="text" id="anime-search-input" placeholder="Search..."><div id="autocomplete-dropdown" class="hidden"></div>div>
-            <button id="btn-find-similar" disabled>Find Similar</button>button>
-        </div>div>
-        <div id="loading-container" class="hidden">Loading...</div>div>
-        <div id="results-container" class="hidden"></div>div>
-    </div>div>
+            <div class="similar-search-box">
+                <h2 class="similar-title">Find Anime Similar To...</h2>
+                <p class="similar-desc">Type an anime you love and we'll find similar titles</p>
+                <div class="search-input-wrapper">
+                    <input type="text" id="anime-search-input" class="anime-search-input"
+                        placeholder="e.g. Attack on Titan, One Piece, Death Note..." autocomplete="off">
+                    <div class="search-icon">🔍</div>
+                    <div class="autocomplete-dropdown hidden" id="autocomplete-dropdown"></div>
+                </div>
+                <button class="btn-action btn-find-similar" id="btn-find-similar" disabled>
+                    Find Similar Anime →
+                </button>
+            </div>
+        </div>
+
+        <!-- ======================== -->
+        <!-- SHARED: Loading State   -->
+        <!-- ======================== -->
+        <div class="loading-container hidden" id="loading-container">
+            <div class="loading-track">
+                <!-- Ocean waves background -->
+                <div class="ocean-waves">
+                    <div class="wave wave-1"></div>
+                    <div class="wave wave-2"></div>
+                    <div class="wave wave-3"></div>
+                </div>
+                <!-- Ship -->
+                <div class="ship" id="runner">
+                    <div class="ship-body">
+                        <!-- Hull -->
+                        <div class="ship-hull"></div>
+                        <div class="ship-hull-stripe"></div>
+                        <!-- Mast -->
+                        <div class="ship-mast"></div>
+                        <!-- Main sail -->
+                        <div class="ship-sail"></div>
+                        <!-- Flag -->
+                        <div class="ship-flag"></div>
+                        <!-- Crow's nest -->
+                        <div class="ship-crows-nest"></div>
+                        <!-- Cabin -->
+                        <div class="ship-cabin"></div>
+                        <!-- Windows -->
+                        <div class="ship-window ship-window-1"></div>
+                        <div class="ship-window ship-window-2"></div>
+                        <!-- Bow -->
+                        <div class="ship-bow"></div>
+                    </div>
+                    <!-- Wake splash -->
+                    <div class="ship-wake"></div>
+                    <div class="ship-wake ship-wake-2"></div>
+                </div>
+                <!-- Wave progress bar at the bottom -->
+                <div class="loading-progress-bar wave-progress">
+                    <div class="loading-progress-fill" id="loading-progress-fill"></div>
+                </div>
+            </div>
+            <p class="loading-text">Sailing through the anime seas<span class="loading-dots"></span></p>
+        </div>
+
+        <!-- ======================== -->
+        <!-- SHARED: Results         -->
+        <!-- ======================== -->
+        <div class="results-container hidden" id="results-container">
+            <h2 class="results-title">Your Anime Matches</h2>
+            <p class="results-subtitle" id="results-count"></p>
+            <div class="results-grid" id="results-grid"></div>
+            <div class="pagination" id="pagination"></div>
+        </div>
+
+        <!-- Error State -->
+        <div class="error-container hidden" id="error-container">
+            <div class="error-icon">⚠</div>
+            <h2 class="error-title">Something went wrong</h2>
+            <p class="error-text" id="error-text"></p>
+            <button class="btn-action btn-retry" id="btn-retry">↻ Retry</button>
+        </div>
+    </div>
+
+    <!-- Robot Mascot (fixed position) -->
     <div class="robot-container" id="robot-container">
-        <div class="robot-eyes"><div class="robot-eye" id="eye-left"><div class="robot-pupil" id="pupil-left"></div>div></div>div><div class="robot-eye" id="eye-right"><div class="robot-pupil" id="pupil-right"></div>div></div>div></div>div>
-        <div class="robot-speech" id="speech-bubble"><span id="speech-text">Hey!</span>span></div>div>
-    </div>div>
+        <div class="robot" id="robot">
+            <div class="robot-hat">
+                <div class="hat-brim"></div>
+                <div class="hat-dome"></div>
+                <div class="hat-band"></div>
+            </div>
+            <div class="robot-head">
+                <div class="robot-antenna">
+                    <div class="antenna-ball"></div>
+                </div>
+                <div class="robot-eyes">
+                    <div class="robot-eye robot-eye-left" id="eye-left">
+                        <div class="robot-pupil" id="pupil-left"></div>
+                        <div class="eye-shine"></div>
+                    </div>
+                    <div class="robot-eye robot-eye-right" id="eye-right">
+                        <div class="robot-pupil" id="pupil-right"></div>
+                        <div class="eye-shine"></div>
+                    </div>
+                </div>
+                <div class="robot-mouth" id="robot-mouth">
+                    <div class="mouth-inner"></div>
+                </div>
+                <div class="robot-cheek cheek-left"></div>
+                <div class="robot-cheek cheek-right"></div>
+            </div>
+            <div class="robot-body">
+                <div class="robot-chest-light"></div>
+                <div class="robot-bolt bolt-left"></div>
+                <div class="robot-bolt bolt-right"></div>
+            </div>
+            <div class="robot-arm robot-arm-left" id="arm-left"></div>
+            <div class="robot-arm robot-arm-right" id="arm-right"></div>
+            <div class="robot-speech" id="robot-speech">
+                <span id="speech-text">Hey! Ready to find your next anime? 🏴‍☠️</span>
+            </div>
+        </div>
+    </div>
+
     <script src="app.js"></script>
+    <script>
+        // Inline Scroll Morph Guard
+        window.addEventListener('scroll', () => {
+            const header = document.querySelector('.app-header');
+            if (header) {
+                if (window.scrollY > 50) {
+                    header.classList.add('scrolled');
+                } else {
+                    header.classList.remove('scrolled');
+                }
+            }
+        });
+    </script>
 </body>
-</html>
-</body></title>
-    </head>
+
+    <!-- Footer -->
+    <footer class="site-footer">
+        <div class="footer-content">
+            <div class="footer-section">
+                <h3 class="footer-title">ONIMATCH</h3>
+                <p class="footer-desc">Your AI-free anime recommendation engine. Discover your next favorite anime
+                    through our smart quiz or find similar titles — all powered by community data from the world's best
+                    anime databases.</p>
+            </div>
+            <div class="footer-section">
+                <h3 class="footer-title">Powered By</h3>
+                <div class="footer-apis">
+                    <a href="https://anilist.co" target="_blank" rel="noopener">AniList</a>
+                    <a href="https://jikan.moe" target="_blank" rel="noopener">Jikan (MAL)</a>
+                    <a href="https://kitsu.io" target="_blank" rel="noopener">Kitsu</a>
+                </div>
+            </div>
+            <div class="footer-section">
+                <h3 class="footer-title">Contact & Feedback</h3>
+                <p class="footer-contact">Found a bug? Have a suggestion? Reach out!</p>
+                <a href="mailto:ishanksachan1701@gmail.com" class="footer-email">📧 ishanksachan1701@gmail.com</a>
+            </div>
+            <div class="footer-bottom">
+                <p>Made with ❤️ for anime fans everywhere</p>
+                <p class="footer-copy">© 2025 ONIMATCH. All anime data belongs to their respective owners.</p>
+            </div>
+        </div>
+    </footer>
+</body>
+
 </html>
