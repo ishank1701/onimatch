@@ -2148,3 +2148,104 @@ window.addEventListener('scroll', () => {
 // ============================================
 renderStep(0);
 setRobotExpression("idle");
+
+// ============================================
+// WELCOME BANNER ? Fragmented Assembly
+// ============================================
+(function initWelcomeBanner() {
+    const banner = document.getElementById('welcome-overlay');
+    const card = document.querySelector('.welcome-banner-card');
+    const closeBtn = document.getElementById('btn-close-banner');
+    const confirmBtn = document.getElementById('btn-banner-confirm');
+    
+    if (!banner || !card) return;
+    
+    // Create fragment container
+    const fragContainer = document.createElement('div');
+    fragContainer.className = 'fragment-container';
+    card.appendChild(fragContainer);
+    
+    const isClosed = localStorage.getItem('onimatch_welcome_closed');
+    
+    if (!isClosed) {
+        setTimeout(startAssembly, 1000);
+    } else {
+        banner.style.display = 'none';
+    }
+    
+    function createFragments(isClosing = false) {
+        fragContainer.innerHTML = '';
+        const rows = 8;
+        const cols = 12;
+        const cardWidth = card.offsetWidth;
+        const cardHeight = card.offsetHeight;
+        const tileW = cardWidth / cols;
+        const tileH = cardHeight / rows;
+        
+        for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+                const tile = document.createElement('div');
+                tile.className = 'fragment-tile';
+                tile.style.width = `${tileW}px`;
+                tile.style.height = `${tileH}px`;
+                tile.style.top = `${r * tileH}px`;
+                tile.style.left = `${c * tileW}px`;
+                
+                // Random start positions from "all over the place"
+                const startX = (Math.random() - 0.5) * 2000;
+                const startY = (Math.random() - 0.5) * 2000;
+                const startRot = (Math.random() - 0.5) * 720;
+                const delay = Math.random() * 0.8;
+                
+                tile.style.setProperty('--startX', `${startX}px`);
+                tile.style.setProperty('--startY', `${startY}px`);
+                tile.style.setProperty('--startRot', `${startRot}deg`);
+                
+                // If closing, set end positions
+                if (isClosing) {
+                    const endX = (Math.random() - 0.5) * 2000;
+                    const endY = (Math.random() - 0.5) * 2000;
+                    const endRot = (Math.random() - 0.5) * 720;
+                    tile.style.setProperty('--endX', `${endX}px`);
+                    tile.style.setProperty('--endY', `${endY}px`);
+                    tile.style.setProperty('--endRot', `${endRot}deg`);
+                    tile.style.animation = `tile-fly-out 0.8s cubic-bezier(0.19, 1, 0.22, 1) ${delay}s forwards`;
+                } else {
+                    tile.style.animation = `tile-fly-in 1.2s cubic-bezier(0.19, 1, 0.22, 1) ${delay}s forwards`;
+                }
+                
+                fragContainer.appendChild(tile);
+            }
+        }
+    }
+    
+    function startAssembly() {
+        banner.classList.remove('hidden');
+        banner.classList.add('assembling');
+        createFragments(false);
+        
+        // After assembly finishes (max delay 0.8 + duration 1.2 = 2s)
+        setTimeout(() => {
+            banner.classList.remove('assembling');
+            // Fade out tiles
+            fragContainer.style.transition = 'opacity 0.5s ease';
+            fragContainer.style.opacity = '0';
+        }, 2200);
+    }
+    
+    function closeBanner() {
+        banner.style.pointerEvents = 'none';
+        banner.classList.add('assembling'); // Hide content
+        fragContainer.style.opacity = '1';
+        createFragments(true);
+        localStorage.setItem('onimatch_welcome_closed', 'true');
+        
+        setTimeout(() => {
+            banner.classList.add('hidden');
+            banner.style.display = 'none';
+        }, 1800);
+    }
+    
+    if (closeBtn) closeBtn.addEventListener('click', closeBanner);
+    if (confirmBtn) confirmBtn.addEventListener('click', closeBanner);
+})();

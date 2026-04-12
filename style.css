@@ -3587,6 +3587,274 @@ body {
     margin-top: 4px;
 }
 
+
+/* ============================================
+   WELCOME BANNER (EDITORIAL NIGHT SEA)
+   ============================================ */
+.welcome-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(12px);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.8s ease, visibility 0.8s ease;
+}
+
+.welcome-overlay:not(.hidden) {
+    opacity: 1;
+    visibility: visible;
+}
+
+.welcome-banner-card {
+    background: rgba(5, 5, 5, 0.95);
+    backdrop-filter: blur(30px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 24px;
+    width: 100%;
+    max-width: 520px;
+    padding: 45px;
+    position: relative;
+    box-shadow: 0 40px 100px -20px rgba(0, 0, 0, 0.8),
+                0 0 50px rgba(255, 255, 255, 0.05);
+    
+    /* Animation Control */
+    opacity: 0;
+    transition: opacity 0.5s ease;
+    overflow: visible; /* Allow shards to fly outside */
+}
+
+/* Fragment Grid Container */
+.fragment-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 10;
+}
+
+.fragment-tile {
+    position: absolute;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(8px);
+    border: 0.5px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.05);
+    transition: all 1.2s cubic-bezier(0.19, 1, 0.22, 1);
+    opacity: 0;
+}
+
+.welcome-overlay:not(.hidden) .welcome-banner-card {
+    opacity: 1;
+}
+
+/* State when tiles are active */
+.assembling .banner-content,
+.assembling .banner-close,
+.assembling .banner-icon-seal {
+    visibility: hidden;
+}
+
+/* Keyframes for the 'Scatter' */
+@keyframes tile-fly-in {
+    0% {
+        opacity: 0;
+        transform: translate(var(--startX), var(--startY)) rotate(var(--startRot)) scale(0);
+    }
+    100% {
+        opacity: 1;
+        transform: translate(0, 0) rotate(0deg) scale(1);
+    }
+}
+
+@keyframes tile-fly-out {
+    0% {
+        opacity: 1;
+        transform: translate(0, 0) rotate(0deg) scale(1);
+    }
+    100% {
+        opacity: 0;
+        transform: translate(var(--endX), var(--endY)) rotate(var(--endRot)) scale(0);
+    }
+}
+
+
+/* Decryption Shimmer */
+.welcome-banner-card::after {
+    content: "";
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(
+        45deg,
+        transparent 45%,
+        rgba(255, 255, 255, 0.1) 50%,
+        transparent 55%
+    );
+    transform: rotate(-45deg);
+    animation: banner-shimmer 3s infinite;
+    pointer-events: none;
+}
+
+@keyframes banner-shimmer {
+    0% { transform: translateX(-100%) rotate(-45deg); }
+    100% { transform: translateX(100%) rotate(-45deg); }
+}
+
+
+.banner-close {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 20px;
+    cursor: pointer;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: all 0.3s ease;
+}
+
+.banner-close:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-primary);
+    transform: rotate(90deg);
+}
+
+.banner-content {
+    text-align: center;
+}
+
+.banner-icon-seal {
+    width: 60px;
+    height: 60px;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
+    margin: 0 auto 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    position: relative;
+}
+
+.banner-hat {
+    position: relative !important;
+    top: 0 !important;
+    left: 0 !important;
+    transform: none !important;
+    width: 60px !important;
+    height: 30px !important;
+    margin-top: -5px;
+}
+
+.banner-hat .hat-brim {
+    width: 60px !important;
+    height: 12px !important;
+}
+
+.banner-hat .hat-dome {
+    width: 38px !important;
+    height: 22px !important;
+    bottom: 5px !important;
+}
+
+.banner-hat .hat-band {
+    width: 38px !important;
+    height: 5px !important;
+    bottom: 5px !important;
+}
+
+.banner-title {
+    font-family: var(--font-display);
+    font-size: 1.8rem;
+    font-weight: 700;
+    margin-bottom: 15px;
+    background: linear-gradient(to bottom, #ffffff 0%, #cbd5e1 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: -0.5px;
+}
+
+.banner-divider {
+    width: 40px;
+    height: 2px;
+    background: rgba(255, 255, 255, 0.3);
+    margin: 0 auto 20px;
+    border-radius: 2px;
+}
+
+.banner-message {
+    color: var(--text-muted);
+    line-height: 1.6;
+    font-size: 0.95rem;
+    margin-bottom: 30px;
+}
+
+.banner-message span {
+    display: block;
+    padding: 15px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 12px;
+    font-size: 0.85rem;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.banner-message strong {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.btn-banner-confirm {
+    background: linear-gradient(135deg, #f8fafc 0%, #94a3b8 100%);
+    color: #0f172a;
+    border: none;
+    padding: 14px 35px;
+    border-radius: 12px;
+    font-size: 1.05rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 20px rgba(255, 255, 255, 0.1);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.btn-banner-confirm:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(255, 255, 255, 0.2);
+    filter: brightness(1.1);
+}
+
+.btn-banner-confirm:active {
+    transform: translateY(0);
+}
+
+@media (max-width: 480px) {
+    .welcome-banner-card {
+        padding: 30px 20px;
+        border-radius: 24px;
+    }
+    .banner-title {
+        font-size: 1.5rem;
+    }
+}
+
 @media (max-width: 640px) {
     .filler-stats-row {
         grid-template-columns: 1fr;
