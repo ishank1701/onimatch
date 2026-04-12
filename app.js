@@ -6,7 +6,7 @@
 const ANILIST_URL = "https://graphql.anilist.co";
 const JIKAN_URL = "https://api.jikan.moe/v4";
 const KITSU_URL = "https://kitsu.io/api/edge";
-const FILLER_API_BASE = "/api/filler/";
+// FILLER_API_BASE removed - using Jikan directly
 
 // ============================================
 // JIKAN (MyAnimeList) HELPERS
@@ -87,6 +87,7 @@ async function searchAnimeAniList(searchQuery) {
             Page(perPage: 6) {
                 media(search: $search, type: ANIME, sort: POPULARITY_DESC) {
                     id
+                    idMal
                     title { romaji english native }
                     synonyms
                     coverImage { large extraLarge }
@@ -152,6 +153,7 @@ async function fetchAnimeDetailsAniList(title) {
         query ($search: String) {
             Media(search: $search, type: ANIME) {
                 id
+                idMal
                 title { romaji english native }
                 description(asHtml: false)
                 coverImage { extraLarge large }
@@ -183,6 +185,7 @@ async function fetchAnimeDetailsByIdAniList(id) {
         query ($id: Int) {
             Media(id: $id, type: ANIME) {
                 id
+                idMal
                 title { romaji english native }
                 description(asHtml: false)
                 coverImage { extraLarge large }
@@ -1373,12 +1376,12 @@ function renderFillerResults(data, pickedTitle) {
     fillerResultsContent.innerHTML = `
         <div class="filler-results-header">
             <h3 class="filler-results-title">${escapeHTML(srcTitle)}</h3>
-            <p class="filler-source-line"><a href="${escapeHTML(sourceUrl)}" target="_blank" rel="noopener">Source: Anime Filler List</a></p>
+            <p class="filler-source-line"><a href="${escapeHTML(sourceUrl)}" target="_blank" rel="noopener">Source: MyAnimeList (Jikan)</a></p>
         </div>
         <div class="filler-stats-row">
-            <div class="filler-stat filler-stat-canon"><span class="filler-stat-pct">${canonPct}%</span><span class="filler-stat-label">Manga canon</span><span class="filler-stat-n">${canon.length} eps</span></div>
+            <div class="filler-stat filler-stat-canon"><span class="filler-stat-pct">${canonPct}%</span><span class="filler-stat-label">Canon</span><span class="filler-stat-n">${canon.length} eps</span></div>
             <div class="filler-stat filler-stat-filler"><span class="filler-stat-pct">${fillerPct}%</span><span class="filler-stat-label">Filler</span><span class="filler-stat-n">${filler.length} eps</span></div>
-            <div class="filler-stat filler-stat-mixed"><span class="filler-stat-pct">${mixedPct}%</span><span class="filler-stat-label">Mixed</span><span class="filler-stat-n">${mixed.length} eps</span></div>
+            <div class="filler-stat filler-stat-mixed"><span class="filler-stat-pct">${mixedPct}%</span><span class="filler-stat-label">Recap</span><span class="filler-stat-n">${mixed.length} eps</span></div>
         </div>
         <p class="filler-total-meta">${total} episodes in guide &mdash; searched as "${escapeHTML(pickedTitle)}"</p>
         ${filler.length ? `<div class="filler-ranges-box"><strong>Filler-only numbers</strong><p class="filler-ranges-text">${escapeHTML(fillerRanges)}</p></div>` : ""}
@@ -1392,66 +1395,82 @@ function renderFillerResults(data, pickedTitle) {
     }
 }
 
+async function fetchFullJikanEpisodes(malId) {
+    let allEpisodes = [];
+    let page = 1;
+    let hasNext = true;
+
+    while (hasNext && page <= 15) { // Cap at 1500 eps to avoid infinite loops
+        try {
+            const res = await fetch(`${JIKAN_URL}/anime/${malId}/episodes?page=${page}`);
+            if (!res.ok) {
+                if (res.status === 429) {
+                    await new Promise(r => setTimeout(r, 1000)); // Rate limited
+                    continue;
+                }
+                break;
+            }
+            const data = await res.json();
+            if (data.data) {
+                allEpisodes = allEpisodes.concat(data.data);
+            }
+            hasNext = data.pagination?.has_next_page || false;
+            page++;
+            if (hasNext) await new Promise(r => setTimeout(r, 400)); // Polite delay
+        } catch (e) {
+            console.error("Jikan fetch error:", e);
+            break;
+        }
+    }
+    return allEpisodes;
+}
+
 async function fetchFillerBreakdown(displayTitle) {
     const title = (displayTitle || "").trim();
     if (!title || !fillerResultsContent) return;
+
     loadingContainer.classList.remove("hidden");
     startRunnerAnimation();
     setRobotExpression("searching");
     if (fillerResultsPanel) fillerResultsPanel.classList.add("hidden");
 
     try {
-        const slug = title
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, "-")
-            .replace(/(^-|-$)/g, "");
-        let res = await fetch(`${FILLER_API_BASE}${encodeURIComponent(slug)}`);
-        
-        // --- Fallback Strategy: If English title fails, try Romaji ---
-        if (!res.ok && selectedFillerAnime && selectedFillerAnime.romaji && selectedFillerAnime.romaji !== title) {
-            console.log("Trying romaji fallback:", selectedFillerAnime.romaji);
-            const fallbackSlug = selectedFillerAnime.romaji
-                .toLowerCase()
-                .replace(/[^a-z0-9]+/g, "-")
-                .replace(/(^-|-$)/g, "");
-            res = await fetch(`${FILLER_API_BASE}${encodeURIComponent(fallbackSlug)}`);
+        // We need the MAL ID for Jikan episodes
+        let malId = selectedFillerAnime ? selectedFillerAnime.idMal : null;
+
+        if (!malId) {
+            // Fallback: search Jikan by title if idMal is missing
+            const jResults = await fetch(`${JIKAN_URL}/anime?q=${encodeURIComponent(title)}&limit=1`);
+            const jData = await jResults.json();
+            malId = jData.data?.[0]?.mal_id;
         }
 
-        const raw = await res.text();
-        let data;
-        try {
-            data = JSON.parse(raw);
-        } catch {
-            throw new Error("Could not read filler API. Ensure server is running.");
+        if (!malId) throw new Error("Could not find this series on MyAnimeList for filler data.");
+
+        const episodes = await fetchFullJikanEpisodes(malId);
+        
+        if (!episodes || !episodes.length) {
+            throw new Error("No episode data found for this anime.");
         }
-        if (!res.ok) {
-            // Handle 404 specifically with a helpful UI
-            if (res.status === 404) {
-                const msg = data.details || "Show not found in database.";
-                setRobotExpression("sad");
-                speechText.textContent = "I couldn't find a filler map for this one!";
-                fillerResultsContent.innerHTML = `
-                    <div class="filler-empty-state" style="text-align: center; padding: 30px 20px;">
-                        <div style="font-size: 3rem; margin-bottom: 15px;">🔍</div>
-                        <h3 style="font-family: var(--font-display); margin-bottom: 10px;">Show not found</h3>
-                        <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 20px;">${escapeHTML(msg)}</p>
-                        <a href="https://www.animefillerlist.com/shows" target="_blank" class="btn-action" style="display: inline-block; text-decoration: none; padding: 10px 20px;">
-                            Search on Anime Filler List →
-                        </a>
-                    </div>
-                `;
-                if (fillerResultsPanel) fillerResultsPanel.classList.remove("hidden");
-                return;
-            }
-            throw new Error(data.details || data.error || `Request failed (${res.status})`);
-        }
-        if (data.error) {
-            throw new Error(data.details || data.error);
-        }
+
+        const canon = episodes.filter(e => !e.filler && !e.recap).map(e => e.mal_id);
+        const filler = episodes.filter(e => e.filler === true).map(e => e.mal_id);
+        const mixed = episodes.filter(e => e.recap === true).map(e => e.mal_id); // Recaps as "mixed" or just highlight them
+
+        const data = {
+            title: title,
+            manga_canon_episodes: canon,
+            filler_episodes: filler,
+            mixed_canon_filler_episodes: mixed,
+            total_episodes: episodes.length,
+            source: `https://myanimelist.net/anime/${malId}/episode`
+        };
+
         renderFillerResults(data, title);
         setRobotExpression("party");
-        speechText.textContent = "Filler map loaded!";
+        speechText.textContent = "Episode guide loaded from Jikan!";
         setTimeout(() => setRobotExpression("idle"), 2500);
+
     } catch (err) {
         console.error(err);
         setRobotExpression("sad");
@@ -1489,6 +1508,7 @@ function renderFillerAutocomplete(results) {
             const t = anime.title?.english || anime.title?.romaji || "";
             selectedFillerAnime = { 
                 id: anime.id, 
+                idMal: anime.idMal,
                 title: t,
                 romaji: anime.title?.romaji || "",
                 synonyms: anime.synonyms || []
