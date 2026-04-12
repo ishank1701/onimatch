@@ -1,0 +1,15 @@
+{
+  "name": "onimatch",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Onimatch static site + optional filler API server",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "axios": "^1.9.0",
+    "cheerio": "^1.1.2",
+    "cors": "^2.8.5",
+    "express": "^4.21.2"
+  }
+}

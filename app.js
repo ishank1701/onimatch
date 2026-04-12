@@ -1,11 +1,12 @@
 /* ============================================
-   ONIMATCH V3 — Fully Static, Multi-API
+   ONIMATCH V3 ? Fully Static, Multi-API
    AniList + Jikan + Kitsu (No AI / No Server)
    ============================================ */
 
 const ANILIST_URL = "https://graphql.anilist.co";
 const JIKAN_URL = "https://api.jikan.moe/v4";
 const KITSU_URL = "https://kitsu.io/api/edge";
+const FILLER_API_BASE = "/api/filler/";
 
 // ============================================
 // JIKAN (MyAnimeList) HELPERS
@@ -86,7 +87,8 @@ async function searchAnimeAniList(searchQuery) {
             Page(perPage: 6) {
                 media(search: $search, type: ANIME, sort: POPULARITY_DESC) {
                     id
-                    title { romaji english }
+                    title { romaji english native }
+                    synonyms
                     coverImage { large extraLarge }
                     format
                     seasonYear
@@ -236,8 +238,8 @@ const QUIZ_STEPS = [
             { label: "Existential & Thoughtful", desc: "In the mood for deep, mind-bending stories", examples: "Serial Experiments Lain, Evangelion, Monster" },
             { label: "Want to Laugh", desc: "Just here for comedy and good vibes", examples: "Gintama, KonoSuba, Grand Blue" },
             { label: "Feeling Adventurous", desc: "Ready to explore new worlds", examples: "One Piece, Made in Abyss, Frieren" },
-            { label: "Spicy & Frisky 🔥", desc: "In the mood for something steamy & bold", examples: "High School DxD, Prison School, Food Wars" },
-            { label: "Dark & Vengeful �-�️", desc: "Craving revenge arcs and anti-heroes", examples: "Vinland Saga, Berserk, Redo of Healer" }
+            { label: "Spicy & Frisky", desc: "In the mood for something steamy & bold", examples: "High School DxD, Prison School, Food Wars" },
+            { label: "Dark & Vengeful", desc: "Craving revenge arcs and anti-heroes", examples: "Vinland Saga, Berserk, Redo of Healer" }
         ]
     },
     {
@@ -313,9 +315,11 @@ let loadingInterval = null;
 let allRecommendations = [];
 let currentPage = 1;
 const PER_PAGE = 10;
-let activeTab = "quiz";       // "quiz" or "similar"
+let activeTab = "quiz";       // "quiz" | "similar" | "filler"
 let selectedAnime = null;     // For similar search
+let selectedFillerAnime = null;
 let searchDebounce = null;
+let fillerSearchDebounce = null;
 let currentMode = "quiz";     // Track which mode generated results
 
 if (!history.state) {
@@ -348,13 +352,20 @@ const btnNext = document.getElementById("btn-next");
 // Tabs
 const tabQuiz = document.getElementById("tab-quiz");
 const tabSimilar = document.getElementById("tab-similar");
+const tabFiller = document.getElementById("tab-filler");
 const sectionQuiz = document.getElementById("section-quiz");
 const sectionSimilar = document.getElementById("section-similar");
+const sectionFiller = document.getElementById("section-filler");
 
 // Search
 const searchInput = document.getElementById("anime-search-input");
 const autocompleteDropdown = document.getElementById("autocomplete-dropdown");
 const btnFindSimilar = document.getElementById("btn-find-similar");
+const fillerSearchInput = document.getElementById("filler-search-input");
+const fillerAutocompleteDropdown = document.getElementById("filler-autocomplete-dropdown");
+const btnFindFiller = document.getElementById("btn-find-filler");
+const fillerResultsPanel = document.getElementById("filler-results-panel");
+const fillerResultsContent = document.getElementById("filler-results-content");
 
 // Robot
 const robot = document.getElementById("robot");
@@ -367,6 +378,15 @@ const speechText = document.getElementById("speech-text");
 // ============================================
 const homeSection = document.getElementById("home-section");
 
+function clearFillerUI() {
+    selectedFillerAnime = null;
+    if (fillerSearchInput) fillerSearchInput.value = "";
+    if (fillerAutocompleteDropdown) fillerAutocompleteDropdown.classList.add("hidden");
+    if (btnFindFiller) btnFindFiller.disabled = true;
+    if (fillerResultsPanel) fillerResultsPanel.classList.add("hidden");
+    if (fillerResultsContent) fillerResultsContent.innerHTML = "";
+}
+
 function goHome(fromPopState = false) {
     if (document.querySelector('.studio-page')) {
         exitStudioPage(true);
@@ -376,9 +396,12 @@ function goHome(fromPopState = false) {
     document.getElementById('features-section').style.display = '';
     document.querySelector('.site-footer').style.display = '';
     // Hide quiz/similar/results/loading/error
-    document.getElementById('tab-bar').classList.add('hidden');
+    const tabBarEl = document.getElementById('tab-bar');
+    tabBarEl.classList.add('hidden');
+    tabBarEl.style.display = '';
     sectionQuiz.classList.remove('active');
     sectionSimilar.classList.remove('active');
+    if (sectionFiller) sectionFiller.classList.remove('active');
     loadingContainer.classList.add('hidden');
     resultsContainer.classList.add('hidden');
     errorContainer.classList.add('hidden');
@@ -388,6 +411,7 @@ function goHome(fromPopState = false) {
     selections = Array(QUIZ_STEPS.length).fill(null);
     renderStep(0);
     clearSelectedAnime();
+    clearFillerUI();
     setRobotExpression('idle');
     speechText.textContent = "Hey! Ready to find your next anime?";
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -403,13 +427,17 @@ function switchTab(tab, fromPopState = false) {
     homeSection.style.display = 'none';
     document.getElementById('features-section').style.display = 'none';
     document.querySelector('.site-footer').style.display = 'none';
-    document.getElementById('tab-bar').classList.remove('hidden');
+    const tabBarShow = document.getElementById('tab-bar');
+    tabBarShow.classList.remove('hidden');
+    tabBarShow.style.display = '';
     // Toggle tab buttons
     tabQuiz.classList.toggle("active", tab === "quiz");
     tabSimilar.classList.toggle("active", tab === "similar");
+    if (tabFiller) tabFiller.classList.toggle("active", tab === "filler");
     // Toggle sections
     sectionQuiz.classList.toggle("active", tab === "quiz");
     sectionSimilar.classList.toggle("active", tab === "similar");
+    if (sectionFiller) sectionFiller.classList.toggle("active", tab === "filler");
     // Hide shared panels
     loadingContainer.classList.add("hidden");
     resultsContainer.classList.add("hidden");
@@ -418,10 +446,13 @@ function switchTab(tab, fromPopState = false) {
     if (tab === "quiz") {
         renderStep(currentStep);
         setRobotExpression("idle");
-        speechText.textContent = "Let's find your match! 🎯";
-    } else {
+        speechText.textContent = "Let's find your match!";
+    } else if (tab === "similar") {
         setRobotExpression("happy");
-        speechText.textContent = "Type an anime you love! 🔍";
+        speechText.textContent = "Type an anime you love!";
+    } else if (tab === "filler") {
+        setRobotExpression("happy");
+        speechText.textContent = "Skip the fluff — see which episodes are filler.";
     }
 
     updateTabIndicator(tab);
@@ -433,7 +464,8 @@ function switchTab(tab, fromPopState = false) {
 
 function updateTabIndicator(tab) {
     const indicator = document.getElementById('tab-indicator');
-    const activeBtn = tab === "quiz" ? tabQuiz : tabSimilar;
+    const map = { quiz: tabQuiz, similar: tabSimilar, filler: tabFiller };
+    const activeBtn = map[tab];
     if (indicator && activeBtn) {
         indicator.style.width = `${activeBtn.offsetWidth}px`;
         indicator.style.left = `${activeBtn.offsetLeft}px`;
@@ -447,8 +479,9 @@ window.addEventListener('resize', () => {
 
 tabQuiz.addEventListener("click", () => switchTab("quiz"));
 tabSimilar.addEventListener("click", () => switchTab("similar"));
+if (tabFiller) tabFiller.addEventListener("click", () => switchTab("filler"));
 
-// Home button + logo click → go home
+// Home button + logo click ? go home
 document.getElementById("btn-home").addEventListener("click", goHome);
 document.querySelector(".hero-logo").addEventListener("click", goHome);
 document.querySelector(".hero-logo").style.cursor = "pointer";
@@ -456,6 +489,8 @@ document.querySelector(".hero-logo").style.cursor = "pointer";
 // CTA buttons
 document.getElementById("btn-cta-quiz").addEventListener("click", () => switchTab("quiz"));
 document.getElementById("btn-cta-similar").addEventListener("click", () => switchTab("similar"));
+const btnCtaFiller = document.getElementById("btn-cta-filler");
+if (btnCtaFiller) btnCtaFiller.addEventListener("click", () => switchTab("filler"));
 
 // ============================================
 // HOMEPAGE DATA LOADING
@@ -482,7 +517,7 @@ function renderHomeCard(anime) {
         <img src="${cover}" alt="${escapeHTML(title)}" loading="lazy">
         <div class="home-card-info">
             <div class="home-card-title">${escapeHTML(title)}</div>
-            <div class="home-card-meta">${score ? '⭐ ' + score : ''} ${eps ? '• ' + eps : ''}</div>
+            <div class="home-card-meta">${score ? score : ''} ${eps ? eps : ''}</div>
         </div>
     </div>`;
 }
@@ -544,7 +579,7 @@ async function loadHomeSection() {
     studioGrid.innerHTML = STUDIOS.map(s => `
         <div class="studio-card" onclick="loadStudioAnime(${s.id}, '${s.name}')">
             <span class="studio-name">${s.name}</span>
-            <span class="studio-arrow">→</span>
+            <span class="studio-arrow">&rarr;</span>
         </div>
     `).join('');
 }
@@ -558,8 +593,8 @@ async function loadStudioAnime(studioId, studioName, fromPopState = false) {
     const homeSection = document.getElementById('home-section');
     homeSection.innerHTML = `
         <div class="studio-page">
-            <button class="studio-back-btn" onclick="exitStudioPage()">← Back to Home</button>
-            <h2 class="studio-page-title">🎨 ${studioName}</h2>
+            <button class="studio-back-btn" onclick="exitStudioPage()">&larr; Back to Home</button>
+            <h2 class="studio-page-title">${studioName}</h2>
             <p class="studio-page-desc">All anime produced by ${studioName}</p>
             <div class="studio-page-loading">Loading all anime<span class="loading-dots"></span></div>
             <div class="studio-anime-grid" id="studio-anime-grid"></div>
@@ -618,7 +653,7 @@ async function loadStudioAnime(studioId, studioName, fromPopState = false) {
                 <div class="studio-anime-info">
                     <div class="studio-anime-title">${escapeHTML(title)}</div>
                     <div class="studio-anime-meta">
-                        ${score ? '⭐ ' + score : ''} ${eps ? '• ' + eps : ''} ${year ? '• ' + year : ''}
+                        ${score ? score : ''} ${eps ? eps : ''} ${year ? year : ''}
                     </div>
                 </div>
             </div>`;
@@ -641,33 +676,36 @@ function exitStudioPage(fromPopState = false) {
     // Rebuild original home HTML structure
     homeSection.innerHTML = `
         <div class="home-cta">
-            <h2 class="home-cta-title">Find Your Perfect Anime ✨</h2>
+            <h2 class="home-cta-title">Find Your Perfect Anime</h2>
             <p class="home-cta-desc">Take our quiz or search for an anime you love</p>
             <div class="home-cta-buttons">
-                <button class="btn-cta-quiz" id="btn-cta-quiz">🎯 Take the Quiz</button>
-                <button class="btn-cta-similar" id="btn-cta-similar">🔍 Find Similar</button>
+                <button class="btn-cta-quiz" id="btn-cta-quiz">Take the Quiz</button>
+                <button class="btn-cta-similar" id="btn-cta-similar">Find Similar</button>
+                <button class="btn-cta-filler" id="btn-cta-filler">Filler guide</button>
             </div>
         </div>
         <div class="home-row">
-            <h3 class="home-row-title">🏆 Top Anime of All Time</h3>
+            <h3 class="home-row-title">Top Anime of All Time</h3>
             <div class="home-scroll" id="home-top-anime"></div>
         </div>
         <div class="home-row">
-            <h3 class="home-row-title">📺 Currently Airing</h3>
+            <h3 class="home-row-title">Currently Airing</h3>
             <div class="home-scroll" id="home-airing"></div>
         </div>
         <div class="home-row">
-            <h3 class="home-row-title">🔮 Top Upcoming</h3>
+            <h3 class="home-row-title">Top Upcoming</h3>
             <div class="home-scroll" id="home-upcoming"></div>
         </div>
         <div class="home-row">
-            <h3 class="home-row-title">🎨 Studio Collections</h3>
+            <h3 class="home-row-title">Studio Collections</h3>
             <div class="studio-grid" id="studio-grid"></div>
         </div>
     `;
     // Re-bind CTA buttons
     document.getElementById('btn-cta-quiz').addEventListener('click', () => switchTab('quiz'));
     document.getElementById('btn-cta-similar').addEventListener('click', () => switchTab('similar'));
+    const ef = document.getElementById('btn-cta-filler');
+    if (ef) ef.addEventListener('click', () => switchTab('filler'));
     // Show footer & features
     document.getElementById('features-section').style.display = '';
     document.querySelector('.site-footer').style.display = '';
@@ -685,7 +723,7 @@ function resetStudioGrid() {
     studioGrid.innerHTML = STUDIOS.map(s => `
         <div class="studio-card" onclick="loadStudioAnime(${s.id}, '${s.name}')">
             <span class="studio-name">${s.name}</span>
-            <span class="studio-arrow">→</span>
+            <span class="studio-arrow">&rarr;</span>
         </div>
     `).join('');
 }
@@ -716,12 +754,12 @@ document.addEventListener("mousemove", (e) => {
 
 const ROBOT_EXPRESSIONS = {
     idle: { cls: '', msg: "Hey nakama! Pick your vibe!" },
-    excited: { cls: 'excited', msg: "Great picks! 🔥" },
-    happy: { cls: 'happy', msg: "Nice choice! 😄" },
-    thinking: { cls: 'thinking', msg: "Hmm, processing... 🤔" },
-    sad: { cls: 'sad', msg: "Oh no... 😢" },
-    searching: { cls: 'thinking', msg: "Scanning anime database... 🔍" },
-    party: { cls: 'excited', msg: "Found your matches! 🎉" }
+    excited: { cls: 'excited', msg: "Great picks!" },
+    happy: { cls: 'happy', msg: "Nice choice!" },
+    thinking: { cls: 'thinking', msg: "Hmm, processing..." },
+    sad: { cls: 'sad', msg: "Oh no..." },
+    searching: { cls: 'thinking', msg: "Scanning anime database..." },
+    party: { cls: 'excited', msg: "Found your matches!" }
 };
 
 function setRobotExpression(expr) {
@@ -733,7 +771,7 @@ function setRobotExpression(expr) {
 }
 
 // ============================================
-// QUIZ — Multi-Select
+// QUIZ ? Multi-Select
 // ============================================
 function renderStep(stepIndex) {
     const step = QUIZ_STEPS[stepIndex];
@@ -806,7 +844,7 @@ function updateNextButton(stepIndex) {
     const sel = selections[stepIndex];
     const hasSelection = Array.isArray(sel) ? sel.length > 0 : sel !== undefined;
     btnNext.disabled = !hasSelection;
-    btnNext.textContent = stepIndex === QUIZ_STEPS.length - 1 ? "Get Recommendations →" : "Next →";
+    btnNext.textContent = stepIndex === QUIZ_STEPS.length - 1 ? "Get Recommendations" : "Next";
 }
 
 // Quiz nav
@@ -853,7 +891,7 @@ function completeRunnerAnimation() {
 function stopRunnerAnimation() { clearInterval(loadingInterval); }
 
 // ============================================
-// QUIZ SUBMIT — AniList Powered (No AI needed!)
+// QUIZ SUBMIT ? AniList Powered (No AI needed!)
 // ============================================
 
 // Map quiz choices to AniList filters
@@ -943,7 +981,7 @@ async function fetchQuizResults() {
         case 5: formatInFilter = ["TV", "TV_SHORT", "ONA"]; episodesGreater = 100; break;
     }
 
-    // Experience → sort order + minimum score
+    // Experience ? sort order + minimum score
     const expVal = Array.isArray(expSel) ? expSel[0] : expSel;
     let sortOrders, minScore;
     switch (expVal) {
@@ -1021,7 +1059,7 @@ async function fetchQuizResults() {
                             episodes: m.episodes ? `${m.episodes} eps` : m.format || "?",
                             rating: m.averageScore ? (m.averageScore / 10).toFixed(1) : "N/A",
                             genres: m.genres || [],
-                            why: `Matches your ${genres[0] || 'selected'} taste • ⭐ ${m.averageScore ? m.averageScore + '%' : 'N/A'} on AniList`,
+                            why: `Matches your ${genres[0] || 'selected'} taste — ${m.averageScore ? m.averageScore + '%' : 'N/A'} on AniList`,
                             coverImage: m.coverImage?.extraLarge || m.coverImage?.large || null,
                             anilistId: m.id
                         });
@@ -1079,7 +1117,7 @@ async function fetchQuizResults() {
                             episodes: m.episodes ? `${m.episodes} eps` : m.format || "?",
                             rating: m.averageScore ? (m.averageScore / 10).toFixed(1) : "N/A",
                             genres: m.genres || [],
-                            why: `Popular ${genres[0] || ''} anime • ⭐ ${m.averageScore ? m.averageScore + '%' : 'N/A'} on AniList`,
+                            why: `Popular ${genres[0] || ''} anime — ${m.averageScore ? m.averageScore + '%' : 'N/A'} on AniList`,
                             coverImage: m.coverImage?.extraLarge || m.coverImage?.large || null,
                             anilistId: m.id
                         });
@@ -1138,10 +1176,13 @@ searchInput.addEventListener("input", () => {
     searchDebounce = setTimeout(() => searchAnimeForAutocomplete(query), 400);
 });
 
-// Close dropdown on click outside
+// Close dropdown on click outside (similar vs filler wrappers)
 document.addEventListener("click", (e) => {
-    if (!e.target.closest(".search-input-wrapper")) {
+    if (!e.target.closest("#section-similar .search-input-wrapper")) {
         autocompleteDropdown.classList.add("hidden");
+    }
+    if (!e.target.closest("#section-filler .search-input-wrapper") && fillerAutocompleteDropdown) {
+        fillerAutocompleteDropdown.classList.add("hidden");
     }
 });
 
@@ -1162,13 +1203,13 @@ function renderAutocomplete(results) {
         const title = anime.title?.english || anime.title?.romaji || '';
         const year = anime.seasonYear || '';
         const type = anime.format || '';
-        const score = anime.averageScore ? `⭐ ${(anime.averageScore / 10).toFixed(1)}` : '';
+        const score = anime.averageScore ? `${(anime.averageScore / 10).toFixed(1)}` : '';
         const anilistId = anime.id;
         return `<div class="ac-item" data-title="${escapeHTML(title)}" data-img="${img}" data-type="${type}" data-year="${year}" data-score="${score}" data-id="${anilistId}">
             <img src="${img}" alt="" class="ac-img">
             <div class="ac-info">
                 <div class="ac-title">${escapeHTML(title)}</div>
-                <div class="ac-meta">${type} ${year ? '• ' + year : ''} ${score}</div>
+                <div class="ac-meta">${type} ${year ? year : ''} ${score}</div>
             </div>
         </div>`;
     }).join("");
@@ -1205,9 +1246,9 @@ function selectAnimeFromSearch(anime) {
         <img src="${anime.img}" alt="${escapeHTML(anime.title)}">
         <div class="selected-anime-info">
             <div class="selected-anime-name">${escapeHTML(anime.title)}</div>
-            <div class="selected-anime-type">${anime.type} ${anime.year ? '• ' + anime.year : ''} ${anime.score}</div>
+            <div class="selected-anime-type">${anime.type} ${anime.year ? anime.year : ''} ${anime.score}</div>
         </div>
-        <button class="btn-clear-anime" id="btn-clear-anime">✕</button>
+        <button class="btn-clear-anime" id="btn-clear-anime">&times;</button>
     `;
     wrapper.parentElement.insertBefore(card, wrapper.nextSibling);
 
@@ -1218,7 +1259,7 @@ function selectAnimeFromSearch(anime) {
     card.querySelector("#btn-clear-anime").addEventListener("click", clearSelectedAnime);
 
     setRobotExpression("happy");
-    speechText.textContent = `${anime.title}! Great taste! 🎌`;
+    speechText.textContent = `${anime.title}! Great taste!`;
     setTimeout(() => setRobotExpression("idle"), 3000);
 }
 
@@ -1268,18 +1309,241 @@ async function submitSimilar() {
 }
 
 // ============================================
-// COVER IMAGES (handled by AniList helpers above)
+// FILLER GUIDE (Anime Filler List via /api/filler)
 // ============================================
+
+function formatEpisodeRanges(sortedNums) {
+    if (!sortedNums || !sortedNums.length) return "";
+    const uniq = [...new Set(sortedNums)].sort((a, b) => a - b);
+    const parts = [];
+    let i = 0;
+    while (i < uniq.length) {
+        const start = uniq[i];
+        let end = start;
+        while (i + 1 < uniq.length && uniq[i + 1] === end + 1) {
+            end++;
+            i++;
+        }
+        i++;
+        parts.push(start === end ? String(start) : `${start}-${end}`);
+    }
+    return parts.join(", ");
+}
+
+function parseFillerEpisodes(val, type) {
+    if (!val) return [];
+    const eps = [];
+    if (Array.isArray(val)) {
+        val.forEach((n) => {
+            const num = Number(n);
+            if (Number.isFinite(num)) eps.push({ n: num, t: type });
+        });
+    } else if (typeof val === "string") {
+        val.split(", ").forEach((p) => {
+            const part = p.trim();
+            if (!part) return;
+            if (part.includes("-")) {
+                const [s, e] = part.split("-").map(Number);
+                if (Number.isFinite(s) && Number.isFinite(e)) {
+                    for (let k = s; k <= e; k++) eps.push({ n: k, t: type });
+                }
+            } else {
+                const n = Number(part);
+                if (Number.isFinite(n)) eps.push({ n, t: type });
+            }
+        });
+    }
+    return eps;
+}
+
+function renderFillerResults(data, pickedTitle) {
+    if (!fillerResultsContent) return;
+    const canon = parseFillerEpisodes(data.manga_canon_episodes || data.cannonEpisodes, "canon");
+    const mixed = parseFillerEpisodes(data.mixed_canon_filler_episodes || data.animecanonsEp, "mixed");
+    const filler = parseFillerEpisodes(data.filler_episodes || data.fillerEpisodes, "filler");
+    const all = [...canon, ...mixed, ...filler].sort((a, b) => a.n - b.n);
+    const total = data.total_episodes || all.length;
+    const canonPct = total > 0 ? Math.round((canon.length / total) * 100) : 0;
+    const fillerPct = total > 0 ? Math.round((filler.length / total) * 100) : 0;
+    const mixedPct = total > 0 ? Math.round((mixed.length / total) * 100) : 0;
+    const srcTitle = data.title || pickedTitle;
+    const fillerRanges = formatEpisodeRanges(filler.map((e) => e.n));
+    const sourceUrl = data.source || "https://www.animefillerlist.com";
+
+    fillerResultsContent.innerHTML = `
+        <div class="filler-results-header">
+            <h3 class="filler-results-title">${escapeHTML(srcTitle)}</h3>
+            <p class="filler-source-line"><a href="${escapeHTML(sourceUrl)}" target="_blank" rel="noopener">Source: Anime Filler List</a></p>
+        </div>
+        <div class="filler-stats-row">
+            <div class="filler-stat filler-stat-canon"><span class="filler-stat-pct">${canonPct}%</span><span class="filler-stat-label">Manga canon</span><span class="filler-stat-n">${canon.length} eps</span></div>
+            <div class="filler-stat filler-stat-filler"><span class="filler-stat-pct">${fillerPct}%</span><span class="filler-stat-label">Filler</span><span class="filler-stat-n">${filler.length} eps</span></div>
+            <div class="filler-stat filler-stat-mixed"><span class="filler-stat-pct">${mixedPct}%</span><span class="filler-stat-label">Mixed</span><span class="filler-stat-n">${mixed.length} eps</span></div>
+        </div>
+        <p class="filler-total-meta">${total} episodes in guide &mdash; searched as "${escapeHTML(pickedTitle)}"</p>
+        ${filler.length ? `<div class="filler-ranges-box"><strong>Filler-only numbers</strong><p class="filler-ranges-text">${escapeHTML(fillerRanges)}</p></div>` : ""}
+        <div class="filler-ep-grid">
+            ${all.map((ep) => `<span class="filler-ep filler-ep-${ep.t}" title="${ep.t}"><span class="filler-ep-num">${ep.n}</span><small>${ep.t}</small></span>`).join("")}
+        </div>
+    `;
+    if (fillerResultsPanel) {
+        fillerResultsPanel.classList.remove("hidden");
+        fillerResultsPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+}
+
+async function fetchFillerBreakdown(displayTitle) {
+    const title = (displayTitle || "").trim();
+    if (!title || !fillerResultsContent) return;
+    loadingContainer.classList.remove("hidden");
+    startRunnerAnimation();
+    setRobotExpression("searching");
+    if (fillerResultsPanel) fillerResultsPanel.classList.add("hidden");
+
+    try {
+        const slug = title
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/(^-|-$)/g, "");
+        let res = await fetch(`${FILLER_API_BASE}${encodeURIComponent(slug)}`);
+        
+        // --- Fallback Strategy: If English title fails, try Romaji ---
+        if (!res.ok && selectedFillerAnime && selectedFillerAnime.romaji && selectedFillerAnime.romaji !== title) {
+            console.log("Trying romaji fallback:", selectedFillerAnime.romaji);
+            const fallbackSlug = selectedFillerAnime.romaji
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, "-")
+                .replace(/(^-|-$)/g, "");
+            res = await fetch(`${FILLER_API_BASE}${encodeURIComponent(fallbackSlug)}`);
+        }
+
+        const raw = await res.text();
+        let data;
+        try {
+            data = JSON.parse(raw);
+        } catch {
+            throw new Error("Could not read filler API. Ensure server is running.");
+        }
+        if (!res.ok) {
+            // Handle 404 specifically with a helpful UI
+            if (res.status === 404) {
+                const msg = data.details || "Show not found in database.";
+                setRobotExpression("sad");
+                speechText.textContent = "I couldn't find a filler map for this one!";
+                fillerResultsContent.innerHTML = `
+                    <div class="filler-empty-state" style="text-align: center; padding: 30px 20px;">
+                        <div style="font-size: 3rem; margin-bottom: 15px;">🔍</div>
+                        <h3 style="font-family: var(--font-display); margin-bottom: 10px;">Show not found</h3>
+                        <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 20px;">${escapeHTML(msg)}</p>
+                        <a href="https://www.animefillerlist.com/shows" target="_blank" class="btn-action" style="display: inline-block; text-decoration: none; padding: 10px 20px;">
+                            Search on Anime Filler List →
+                        </a>
+                    </div>
+                `;
+                if (fillerResultsPanel) fillerResultsPanel.classList.remove("hidden");
+                return;
+            }
+            throw new Error(data.details || data.error || `Request failed (${res.status})`);
+        }
+        if (data.error) {
+            throw new Error(data.details || data.error);
+        }
+        renderFillerResults(data, title);
+        setRobotExpression("party");
+        speechText.textContent = "Filler map loaded!";
+        setTimeout(() => setRobotExpression("idle"), 2500);
+    } catch (err) {
+        console.error(err);
+        setRobotExpression("sad");
+        speechText.textContent = "Something went wrong with the lookup.";
+        fillerResultsContent.innerHTML = `<p class="filler-error">${escapeHTML(err.message || "Unknown error")}</p>`;
+        if (fillerResultsPanel) fillerResultsPanel.classList.remove("hidden");
+    } finally {
+        stopRunnerAnimation();
+        loadingContainer.classList.add("hidden");
+        if (runner) runner.style.left = "0%";
+        if (loadingProgressFill) loadingProgressFill.style.width = "0%";
+    }
+}
+
+function renderFillerAutocomplete(results) {
+    if (!fillerAutocompleteDropdown) return;
+    fillerAutocompleteDropdown.innerHTML = results
+        .map((anime) => {
+            const img = anime.coverImage?.large || "";
+            const t = anime.title?.english || anime.title?.romaji || "";
+            return `<div class="ac-item">
+                <img src="${img}" alt="" class="ac-img">
+                <div class="ac-info">
+                    <div class="ac-title">${escapeHTML(t)}</div>
+                    <div class="ac-meta">${anime.format || ""} ${anime.seasonYear ? anime.seasonYear : ""}</div>
+                </div>
+            </div>`;
+        })
+        .join("");
+
+    fillerAutocompleteDropdown.classList.remove("hidden");
+    fillerAutocompleteDropdown.querySelectorAll(".ac-item").forEach((item, idx) => {
+        item.addEventListener("click", () => {
+            const anime = results[idx];
+            const t = anime.title?.english || anime.title?.romaji || "";
+            selectedFillerAnime = { 
+                id: anime.id, 
+                title: t,
+                romaji: anime.title?.romaji || "",
+                synonyms: anime.synonyms || []
+            };
+            if (fillerSearchInput) fillerSearchInput.value = t;
+            fillerAutocompleteDropdown.classList.add("hidden");
+            if (btnFindFiller) btnFindFiller.disabled = false;
+            fetchFillerBreakdown(t);
+        });
+    });
+}
+
+async function searchFillerAutocomplete(query) {
+    try {
+        const results = await searchAnimeAniList(query);
+        if (!results || !results.length) {
+            if (fillerAutocompleteDropdown) fillerAutocompleteDropdown.classList.add("hidden");
+            return;
+        }
+        renderFillerAutocomplete(results);
+    } catch (e) { /* silent */ }
+}
+
+if (fillerSearchInput) {
+    fillerSearchInput.addEventListener("input", () => {
+        if (btnFindFiller) btnFindFiller.disabled = fillerSearchInput.value.trim().length === 0;
+        clearTimeout(fillerSearchDebounce);
+        const q = fillerSearchInput.value.trim();
+        if (q.length < 2) {
+            if (fillerAutocompleteDropdown) fillerAutocompleteDropdown.classList.add("hidden");
+            return;
+        }
+        fillerSearchDebounce = setTimeout(() => searchFillerAutocomplete(q), 400);
+    });
+}
+
+if (btnFindFiller) {
+    btnFindFiller.addEventListener("click", () => {
+        const t = fillerSearchInput ? fillerSearchInput.value.trim() : "";
+        if (t) {
+            if (btnFindFiller) btnFindFiller.disabled = false;
+            fetchFillerBreakdown(t);
+        }
+    });
+}
 
 // ============================================
 // PAGINATION + SIDEBAR
 // ============================================
 
 // Sidebar step icons
-const SIDEBAR_ICONS = ['🎭', '🎬', '⏱️', '🎯', '🧠'];
+const SIDEBAR_ICONS = ['', '', '', '', ''];
 
 function generateSidebarHTML() {
-    let html = `<h3 class="sidebar-title">✨ Your Filters</h3>`;
+    let html = `<h3 class="sidebar-title">Your Filters</h3>`;
     QUIZ_STEPS.forEach((step, stepIdx) => {
         const sel = selections[stepIdx];
         html += `<div class="sidebar-section">
@@ -1296,8 +1560,8 @@ function generateSidebarHTML() {
         html += `</div></div>`;
     });
     html += `<div class="sidebar-actions">
-        <button class="btn-refresh-results" onclick="refreshFromSidebar()">🔄 Update Results</button>
-        <button class="btn-feeling-lucky" onclick="feelingLucky()">🎲 Feeling Lucky</button>
+        <button class="btn-refresh-results" onclick="refreshFromSidebar()">Update Results</button>
+        <button class="btn-feeling-lucky" onclick="feelingLucky()">Feeling Lucky</button>
     </div>`;
     return html;
 }
@@ -1339,7 +1603,7 @@ async function refreshFromSidebar() {
     const refreshBtn = document.querySelector('.btn-refresh-results');
     if (grid) grid.style.opacity = '0.35';
     if (refreshBtn) {
-        refreshBtn.textContent = '⏳ Updating...';
+        refreshBtn.textContent = 'Updating...';
         refreshBtn.disabled = true;
     }
 
@@ -1355,7 +1619,7 @@ async function refreshFromSidebar() {
         // Restore grid opacity if failed
         if (grid) grid.style.opacity = '1';
         if (refreshBtn) {
-            refreshBtn.textContent = '🔄 Update Results';
+            refreshBtn.textContent = 'Update Results';
             refreshBtn.disabled = false;
         }
         setRobotExpression("sad");
@@ -1433,7 +1697,7 @@ function showResultsPage(page) {
                     <div class="pagination" id="pagination"></div>
                 </div>
             </div>
-            <button class="sidebar-fab" id="sidebar-fab" onclick="openMobileSheet()">⚙️</button>
+            <button class="sidebar-fab" id="sidebar-fab" onclick="openMobileSheet()">Filters</button>
             <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeMobileSheet()"></div>
             <div class="sidebar-bottom-sheet" id="sidebar-bottom-sheet"></div>
         `;
@@ -1462,11 +1726,11 @@ function showResultsPage(page) {
 function renderPagination(totalPages, container) {
     const el = container || paginationEl;
     if (totalPages <= 1) { el.innerHTML = ""; return; }
-    let html = `<button class="page-btn nav-btn" ${currentPage === 1 ? "disabled" : ""} onclick="showResultsPage(${currentPage - 1})">← Prev</button>`;
+    let html = `<button class="page-btn nav-btn" ${currentPage === 1 ? "disabled" : ""} onclick="showResultsPage(${currentPage - 1})">&larr; Prev</button>`;
     for (let p = 1; p <= totalPages; p++) {
         html += `<button class="page-btn ${p === currentPage ? 'active' : ''}" onclick="showResultsPage(${p})">${p}</button>`;
     }
-    html += `<button class="page-btn nav-btn" ${currentPage === totalPages ? "disabled" : ""} onclick="showResultsPage(${currentPage + 1})">Next →</button>`;
+    html += `<button class="page-btn nav-btn" ${currentPage === totalPages ? "disabled" : ""} onclick="showResultsPage(${currentPage + 1})">Next &rarr;</button>`;
     el.innerHTML = html;
 }
 
@@ -1486,11 +1750,11 @@ function renderResults(animeList, startIndex, gridEl) {
         return `<div class="result-card" style="animation-delay:${i * 0.06}s" onclick="openAnimeDetail(${globalIdx})" role="button" tabindex="0">
             <div class="result-card-inner">${coverImg}<div class="result-info">
                 <div class="result-rank-title"><span class="result-rank">${rank}</span><h3 class="result-title">${escapeHTML(anime.title)}</h3></div>
-                <div class="result-meta">${genrePills}<span class="result-episodes">📺 ${escapeHTML(anime.episodes)}</span><span class="result-rating">⭐ ${anime.rating}/10</span></div>
+                <div class="result-meta">${genrePills}<span class="result-episodes">${escapeHTML(anime.episodes)}</span><span class="result-rating">${anime.rating}/10</span></div>
                 <p class="result-synopsis">${escapeHTML(anime.synopsis)}</p>
             </div></div>
-            <div class="result-why">💬 ${escapeHTML(anime.why)}</div>
-            <div class="result-footer"><span class="result-difficulty ${diffClass}">${escapeHTML(diffLabel)}</span><span class="result-detail-hint">Click for trailer & details →</span></div>
+            <div class="result-why">${escapeHTML(anime.why)}</div>
+            <div class="result-footer"><span class="result-difficulty ${diffClass}">${escapeHTML(diffLabel)}</span><span class="result-detail-hint">Click for trailer & details</span></div>
         </div>`;
     }).join("");
 }
@@ -1507,7 +1771,7 @@ async function openAnimeDetail(index, directTitle, directAnilistId, fromPopState
     let fetchById = false;
 
     if (directAnilistId) {
-        // Called from homepage card — use anilist ID directly
+        // Called from homepage card ? use anilist ID directly
         anime = { title: directTitle || '', anilistId: directAnilistId };
         fetchById = true;
     } else {
@@ -1527,7 +1791,7 @@ async function openAnimeDetail(index, directTitle, directAnilistId, fromPopState
     // Show loading state
     modal.innerHTML = `
         <div class="anime-modal">
-            <button class="modal-close" onclick="closeAnimeDetail()">✕</button>
+            <button class="modal-close" onclick="closeAnimeDetail()">&times;</button>
             <div class="modal-loading">Loading details<span class="loading-dots"></span></div>
         </div>
     `;
@@ -1558,7 +1822,7 @@ async function openAnimeDetail(index, directTitle, directAnilistId, fromPopState
         if (details.trailer && details.trailer.site === 'youtube') {
             trailerHTML = `
                 <div class="modal-trailer">
-                    <h3>🎬 Trailer</h3>
+                    <h3>Trailer</h3>
                     <div class="trailer-wrapper">
                         <iframe src="https://www.youtube.com/embed/${details.trailer.id}" 
                             frameborder="0" allowfullscreen
@@ -1570,7 +1834,7 @@ async function openAnimeDetail(index, directTitle, directAnilistId, fromPopState
         } else if (details.trailer && details.trailer.site === 'dailymotion') {
             trailerHTML = `
                 <div class="modal-trailer">
-                    <h3>🎬 Trailer</h3>
+                    <h3>Trailer</h3>
                     <div class="trailer-wrapper">
                         <iframe src="https://www.dailymotion.com/embed/video/${details.trailer.id}" 
                             frameborder="0" allowfullscreen>
@@ -1583,9 +1847,9 @@ async function openAnimeDetail(index, directTitle, directAnilistId, fromPopState
             const ytSearchURL = `https://www.youtube.com/results?search_query=${encodeURIComponent(title + ' anime trailer')}`;
             trailerHTML = `
                 <div class="modal-trailer">
-                    <h3>🎬 Trailer</h3>
+                    <h3>Trailer</h3>
                     <a href="${ytSearchURL}" target="_blank" rel="noopener noreferrer" class="trailer-fallback-link">
-                        ▶️ Watch Trailer on YouTube →
+                        Watch Trailer on YouTube
                     </a>
                 </div>
             `;
@@ -1595,25 +1859,25 @@ async function openAnimeDetail(index, directTitle, directAnilistId, fromPopState
 
         modal.innerHTML = `
             <div class="anime-modal">
-                <button class="modal-close" onclick="closeAnimeDetail()">✕</button>
+                <button class="modal-close" onclick="closeAnimeDetail()">&times;</button>
                 ${banner ? `<div class="modal-banner"><img src="${banner}" alt="${escapeHTML(title)}"></div>` : ''}
                 <div class="modal-content">
                     <h2 class="modal-title">${escapeHTML(title)}</h2>
                     <div class="modal-meta-row">
-                        ${score !== 'N/A' ? `<span class="modal-score">⭐ ${score}/10</span>` : ''}
-                        ${eps ? `<span class="modal-ep">📺 ${eps} episodes</span>` : ''}
+                        ${score !== 'N/A' ? `<span class="modal-score">${score}/10</span>` : ''}
+                        ${eps ? `<span class="modal-ep">${eps} episodes</span>` : ''}
                         ${format ? `<span class="modal-format">${format}</span>` : ''}
                         ${status ? `<span class="modal-status">${status}</span>` : ''}
                     </div>
                     <div class="modal-meta-row">
-                        ${year ? `<span>📅 ${season} ${year}</span>` : ''}
-                        ${studio ? `<span>🎨 ${studio}</span>` : ''}
-                        ${popularity ? `<span>❤️ ${popularity} fans</span>` : ''}
+                        ${year ? `<span>${season} ${year}</span>` : ''}
+                        ${studio ? `<span>${studio}</span>` : ''}
+                        ${popularity ? `<span>${popularity} fans</span>` : ''}
                     </div>
                     <div class="modal-genres">${genrePills}</div>
                     ${trailerHTML}
                     <div class="modal-description">
-                        <h3>📖 Description</h3>
+                        <h3>Description</h3>
                         <p>${escapeHTML(desc)}</p>
                     </div>
                 </div>
@@ -1625,19 +1889,19 @@ async function openAnimeDetail(index, directTitle, directAnilistId, fromPopState
         // Fallback to what we already have
         modal.innerHTML = `
             <div class="anime-modal">
-                <button class="modal-close" onclick="closeAnimeDetail()">✕</button>
+                <button class="modal-close" onclick="closeAnimeDetail()">&times;</button>
                 <div class="modal-content">
                     <h2 class="modal-title">${escapeHTML(anime.title)}</h2>
                     <div class="modal-meta-row">
-                        <span class="modal-score">⭐ ${anime.rating}/10</span>
-                        <span class="modal-ep">📺 ${anime.episodes}</span>
+                        <span class="modal-score">${anime.rating}/10</span>
+                        <span class="modal-ep">${anime.episodes}</span>
                     </div>
                     <div class="modal-genres">${(anime.genres || []).map(g => `<span class="genre-pill">${escapeHTML(g)}</span>`).join('')}</div>
                     <div class="modal-description">
-                        <h3>📖 Description</h3>
+                        <h3>Description</h3>
                         <p>${escapeHTML(anime.synopsis)}</p>
                     </div>
-                    <p style="color: var(--muted); margin-top: 1rem;">⚠️ Could not load trailer. Try again later.</p>
+                    <p style="color: var(--muted); margin-top: 1rem;">Could not load trailer. Try again later.</p>
                 </div>
             </div>
         `;
@@ -1704,6 +1968,7 @@ function resetAll() {
 
     // Reset similar search
     clearSelectedAnime();
+    clearFillerUI();
     searchInput.value = "";
 
     switchTab(currentMode);
@@ -1763,7 +2028,7 @@ function escapeHTML(str) {
 // ============================================
 // EVENTS
 // ============================================
-btnTryAgain.addEventListener("click", resetAll);
+if (btnTryAgain) btnTryAgain.addEventListener("click", resetAll);
 btnRetry.addEventListener("click", () => {
     errorContainer.classList.add("hidden");
     if (currentMode === "quiz") submitQuiz();
@@ -1771,7 +2036,7 @@ btnRetry.addEventListener("click", () => {
 });
 
 // ============================================
-// ROBOT — Draggable (Mouse + Touch)
+// ROBOT ? Draggable (Mouse + Touch)
 // ============================================
 (function initDraggableRobot() {
     const robotEl = document.getElementById("robot-container");
