@@ -75,9 +75,9 @@ async function anilistQuery(query, variables = {}) {
         headers: { "Content-Type": "application/json", "Accept": "application/json" },
         body: JSON.stringify({ query, variables })
     });
-    if (!res.ok) throw new Error(`AniList API error ${res.status}`);
     const json = await res.json();
     if (json.errors) throw new Error(json.errors[0]?.message || "AniList query failed");
+    if (!res.ok) throw new Error(`AniList API error ${res.status}`);
     return json.data;
 }
 
@@ -1012,7 +1012,7 @@ async function fetchQuizResults() {
 
     for (const sort of sortOrders) {
         let queryArgs = `$sort: [MediaSort], $minScore: Int`;
-        let mediaArgs = `type: ANIME, sort: [$sort], averageScore_greater: $minScore, isAdult: false`;
+        let mediaArgs = `type: ANIME, sort: $sort, averageScore_greater: $minScore, isAdult: false`;
 
         if (formatInFilter !== null) {
             queryArgs += `, $formatIn: [MediaFormat]`;
@@ -1164,6 +1164,10 @@ async function submitQuiz() {
         allRecommendations = await fetchQuizResults();
         completeRunnerAnimation();
         await new Promise(r => setTimeout(r, 600));
+
+        // Push results state so closing modals returns here, not to the quiz
+        history.pushState({ layer: 'results', tab: activeTab, mode: currentMode }, "");
+
         currentPage = 1;
         showResultsPage(1);
         setRobotExpression("party");
@@ -1308,6 +1312,9 @@ async function submitSimilar() {
 
         completeRunnerAnimation();
         await new Promise(r => setTimeout(r, 600));
+
+        // Push results state for similar search
+        history.pushState({ layer: 'results', tab: activeTab, mode: currentMode }, "");
 
         currentPage = 1;
         showResultsPage(1);
@@ -1713,7 +1720,7 @@ function closeMobileSheet(fromPopState = false) {
     }
 }
 
-function showResultsPage(page) {
+function showResultsPage(page, fromPopState = false) {
     loadingContainer.classList.add("hidden");
     resultsContainer.classList.remove("hidden");
     const totalPages = Math.ceil(allRecommendations.length / PER_PAGE);
@@ -2039,6 +2046,22 @@ window.addEventListener('popstate', (e) => {
             goHome(true);
         } else if (state.layer === 'tab') {
             switchTab(state.tab, true);
+        } else if (state.layer === 'results') {
+            // Restore results view without re-fetching from API
+            activeTab = state.tab || 'quiz';
+            currentMode = state.mode || 'quiz';
+
+            // Hide entry views and show results
+            homeSection.style.display = 'none';
+            document.getElementById('features-section').style.display = 'none';
+            document.querySelector('.site-footer').style.display = 'none';
+            
+            sectionQuiz.classList.remove('active');
+            sectionSimilar.classList.remove('active');
+            if (sectionFiller) sectionFiller.classList.remove('active');
+            
+            loadingContainer.classList.add("hidden");
+            showResultsPage(currentPage, true);
         } else if (state.layer === 'studio') {
             // If going forward/back to a studio page
             if (!document.querySelector('.studio-page')) {
