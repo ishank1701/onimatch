@@ -871,27 +871,38 @@ btnNext.addEventListener("click", () => {
 // LOADING ANIMATION
 // ============================================
 function startRunnerAnimation() {
+    clearInterval(loadingInterval);
     let progress = 0;
     loadingInterval = setInterval(() => {
-        if (progress < 70) progress += 1.5;
-        else if (progress < 90) progress += 0.2;
+        if (progress < 75) progress += 0.8;
+        else if (progress < 95) progress += 0.1;
         updateRunnerPosition(progress);
-    }, 100);
+    }, 50); // Faster, smoother updates
 }
 function updateRunnerPosition(pct) {
     const c = Math.min(pct, 100);
-    runner.style.left = c + "%";
-    loadingProgressFill.style.width = c + "%";
+    const runner = document.getElementById('runner');
+    const loadingProgressFill = document.querySelector('.loading-progress-fill');
+    if (runner) runner.style.left = c + "%";
+    if (loadingProgressFill) loadingProgressFill.style.width = c + "%";
 }
 function completeRunnerAnimation() {
     clearInterval(loadingInterval);
-    let cur = parseFloat(runner.style.left) || 0;
+    let cur = parseFloat(document.getElementById('runner')?.style.left) || 0;
     const finish = setInterval(() => {
-        cur += 3; if (cur >= 100) { cur = 100; clearInterval(finish); }
+        cur += 4;
+        if (cur >= 100) { 
+            cur = 100; 
+            clearInterval(finish); 
+            // Reset after a short delay so it's ready for next time
+            setTimeout(() => updateRunnerPosition(0), 1000);
+        }
         updateRunnerPosition(cur);
-    }, 30);
+    }, 20);
 }
-function stopRunnerAnimation() { clearInterval(loadingInterval); }
+function stopRunnerAnimation() { 
+    clearInterval(loadingInterval);
+}
 
 // ============================================
 // QUIZ SUBMIT ? AniList Powered (No AI needed!)
@@ -1398,9 +1409,9 @@ function renderFillerResults(data, pickedTitle) {
 async function fetchFullJikanEpisodes(malId) {
     let allEpisodes = [];
     let page = 1;
-    let hasNext = true;
-
-    while (hasNext && page <= 15) { // Cap at 1500 eps to avoid infinite loops
+    let maxPages = 20; // Enough for 2000 episodes
+    
+    while (page <= maxPages) {
         try {
             const res = await fetch(`${JIKAN_URL}/anime/${malId}/episodes?page=${page}`);
             if (!res.ok) {
@@ -1411,12 +1422,16 @@ async function fetchFullJikanEpisodes(malId) {
                 break;
             }
             const data = await res.json();
-            if (data.data) {
-                allEpisodes = allEpisodes.concat(data.data);
-            }
-            hasNext = data.pagination?.has_next_page || false;
+            const pageData = data.data || [];
+            
+            if (pageData.length === 0) break; // End of guide
+            
+            allEpisodes = allEpisodes.concat(pageData);
+            
+            // Jikan search for episodes pagination is often unreliable. 
+            // We continue until we get an empty array.
             page++;
-            if (hasNext) await new Promise(r => setTimeout(r, 400)); // Polite delay
+            await new Promise(r => setTimeout(r, 400)); // Polite delay
         } catch (e) {
             console.error("Jikan fetch error:", e);
             break;
@@ -1515,8 +1530,11 @@ function renderFillerAutocomplete(results) {
             };
             if (fillerSearchInput) fillerSearchInput.value = t;
             fillerAutocompleteDropdown.classList.add("hidden");
-            if (btnFindFiller) btnFindFiller.disabled = false;
-            fetchFillerBreakdown(t);
+            if (btnFindFiller) {
+                btnFindFiller.disabled = false;
+                btnFindFiller.classList.add("ready-pulse"); // Visual cue to click
+            }
+            // fetchFillerBreakdown(t); // MOVED to button click only
         });
     });
 }
@@ -2157,6 +2175,15 @@ setRobotExpression("idle");
     const card = document.querySelector('.welcome-banner-card');
     const closeBtn = document.getElementById('btn-close-banner');
     const confirmBtn = document.getElementById('btn-banner-confirm');
+    const mascot = document.getElementById('robot');
+    
+    // Easter Egg: Double click mascot to reset banner for testing
+    if (mascot) {
+        mascot.addEventListener('dblclick', () => {
+            localStorage.removeItem('onimatch_welcome_closed');
+            location.reload();
+        });
+    }
     
     if (!banner || !card) return;
     
@@ -2185,9 +2212,19 @@ setRobotExpression("idle");
         for (let r = 0; r < rows; r++) {
             for (let c = 0; c < cols; c++) {
                 const tile = document.createElement('div');
-                tile.className = 'fragment-tile';
-                tile.style.width = `${tileW}px`;
-                tile.style.height = `${tileH}px`;
+                
+                // Deterministic Jigsaw Piece Selection based on Grid Position
+                let pzClass = 'pz-mid-a';
+                if ((r + c) % 2 === 0) pzClass = 'pz-mid-b'; // Checkerboard pattern for interior
+                
+                // Edge/Corner overwrites
+                if (r === 0) pzClass = 'pz-edge-t';
+                if (r === rows - 1) pzClass = 'pz-edge-b';
+                if (r === 0 && c === 0) pzClass = 'pz-corner-tl';
+                
+                tile.className = `fragment-tile ${pzClass}`;
+                tile.style.width = `${tileW + 2}px`; // Slight overlap for interlocking
+                tile.style.height = `${tileH + 2}px`;
                 tile.style.top = `${r * tileH}px`;
                 tile.style.left = `${c * tileW}px`;
                 

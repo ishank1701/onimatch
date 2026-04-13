@@ -1153,7 +1153,7 @@ body {
     margin: 0 auto 16px;
 }
 
-.anime-search-input {
+.anime-search-input, .filler-search-input {
     width: 100%;
     padding: 14px 44px 14px 16px;
     font-family: var(--font-body);
@@ -1166,6 +1166,20 @@ body {
     outline: none;
     transition: all var(--transition);
 }
+
+.btn-find-filler.ready-pulse {
+    animation: buttonPulse 1.5s infinite;
+    background: var(--gradient-main);
+    color: white;
+    border-color: rgba(255, 255, 255, 0.4);
+}
+
+@keyframes buttonPulse {
+    0% { box-shadow: 0 0 0 0 rgba(226, 232, 240, 0.4); }
+    70% { box-shadow: 0 0 0 10px rgba(226, 232, 240, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(226, 232, 240, 0); }
+}
+
 
 .anime-search-input::placeholder {
     color: var(--text-muted);
@@ -1439,6 +1453,21 @@ body {
     z-index: 3;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
+
+/* Specific scaling for the hat inside the banner icon seal */
+.banner-hat {
+    transform: translateX(-50%) rotate(-4deg) scale(0.35) !important;
+    top: -5px !important;
+}
+
+.banner-hat .hat-brim {
+    border-width: 3px !important;
+}
+
+.banner-hat .hat-dome {
+    border-width: 3px !important;
+}
+
 
 /* --- Robot Head --- */
 .robot-head {
@@ -2116,7 +2145,6 @@ body {
     width: 70px;
     height: 80px;
     z-index: 5;
-    transition: left 0.3s ease;
     animation: shipBob 2.5s ease-in-out infinite;
 }
 
@@ -3645,19 +3673,67 @@ body {
 
 .fragment-tile {
     position: absolute;
-    background: rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(8px);
-    border: 0.5px solid rgba(255, 255, 255, 0.3);
-    box-shadow: 0 0 10px rgba(255, 255, 255, 0.05);
+    background: rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(4px);
+    border: 0.5px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.05);
     transition: all 1.2s cubic-bezier(0.19, 1, 0.22, 1);
     opacity: 0;
+}
+
+/* Jigsaw Puzzle Piece Variants */
+/* Tab Out = bulge, Tab In = indentation */
+
+/* Pattern A: Interior (Top: In, Right: Out, Bottom: Out, Left: In) */
+.pz-mid-a {
+    clip-path: polygon(
+        0% 35%, 10% 35%, 10% 25%, 25% 25%, 25% 35%, 0% 35%, /* Top In */
+        0% 0%, 100% 0%, 
+        100% 35%, 110% 35%, 110% 65%, 100% 65%, /* Right Out */
+        100% 100%, 75% 100%, 75% 110%, 45% 110%, 45% 100%, /* Bottom Out */
+        0% 100%, 0% 65%, 10% 65%, 10% 35% /* Left In */
+    );
+}
+
+/* Pattern B: Interior (Top: Out, Right: In, Bottom: In, Left: Out) - Inverse of A */
+.pz-mid-b {
+    clip-path: polygon(
+        0% 0%, 35% 0%, 35% -10%, 65% -10%, 65% 0%, 100% 0%, /* Top Out */
+        100% 35%, 90% 35%, 90% 65%, 100% 65%, /* Right In */
+        100% 100%, 0% 100%, 
+        0% 65%, -10% 65%, -10% 35%, 0% 35% /* Left Out */
+    );
+}
+
+/* Edge Top */
+.pz-edge-t {
+    clip-path: polygon(0% 0%, 100% 0%, 100% 35%, 110% 35%, 110% 65%, 100% 65%, 100% 100%, 0% 100%, 0% 65%, 10% 65%, 10% 35%);
+}
+
+/* Edge Bottom */
+.pz-edge-b {
+    clip-path: polygon(0% 0%, 35% 0%, 35% -10%, 65% -10%, 65% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 65%, -10% 65%, -10% 35%, 0% 35%);
+}
+
+/* Corner Top-Left */
+.pz-corner-tl {
+    clip-path: polygon(0% 0%, 100% 0%, 100% 35%, 110% 35%, 110% 65%, 100% 65%, 100% 100%, 0% 100%);
 }
 
 .welcome-overlay:not(.hidden) .welcome-banner-card {
     opacity: 1;
 }
 
-/* State when tiles are active */
+/* State when tiles are active: Hide the main background card fully */
+.assembling .welcome-banner-card {
+    background: transparent !important;
+    backdrop-filter: none !important; /* CRITICAL: Remove blur to make box truly invisible */
+    border: none !important;
+    box-shadow: none !important;
+    transition: none !important;
+    opacity: 1 !important; 
+}
+
 .assembling .banner-content,
 .assembling .banner-close,
 .assembling .banner-icon-seal {
